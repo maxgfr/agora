@@ -4,10 +4,10 @@
  * across groups, so two groups cannot link their members) from which both
  * the ristretto voting key and the X25519 box key are derived.
  */
-import { blindRequest } from "../crypto/blind";
+import { blindRequest, type Issuer, issuerSign } from "../crypto/blind";
 import { type KeyPair, keyPairFromSeed, ringSign, schnorrSign } from "../crypto/ristretto";
 import { boxKeyPair, boxSeal, type GroupKeys, keyId } from "../crypto/seal";
-import { type Bytes, fromB64u, randomBytes, toB64u, utf8 } from "../lib/bytes";
+import { type Bytes, concat, fromB64u, randomBytes, toB64u, utf8 } from "../lib/bytes";
 import {
   type Action,
   type Admit,
@@ -17,9 +17,12 @@ import {
   type Genesis,
   type KeyEvent,
   type MemberCard,
+  type PassBatch,
   type Pledge,
   type Policy,
   type Poll,
+  passMessage,
+  passTag,
   pledgeTag,
   type RequestEvent,
   requestContext,
@@ -105,14 +108,92 @@ export function createVouchEvent(
   return { t: "vouch", ts: now, for: card, by: v.by, sig: v.sig };
 }
 
+// ---------------------------------------------------------------------------
+// Entry passwords
+
+/** No 0/O, 1/I/L: easy to read out loud and to type. 31 symbols, 12 of them: ~59 bits. */
+export const PASS_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const PASS_LEN = 12;
+
+export function newPassword(): string {
+  const out: string[] = [];
+  // Rejection sampling: no bias towards the first symbols.
+  while (out.length < PASS_LEN) {
+    for (const b of randomBytes(16)) {
+      if (b < 248 && out.length < PASS_LEN) out.push(PASS_ALPHABET[b % 31] as string);
+    }
+  }
+  const s = out.join("");
+  return `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8)}`;
+}
+
+/** A password as typed (any case, spaces or dashes), or null if it cannot be one. */
+export function normalizePassword(text: string): string | null {
+  const s = text.toUpperCase().replace(/[\s-]/g, "");
+  if (s.length !== PASS_LEN) return null;
+  for (const c of s) if (!PASS_ALPHABET.includes(c)) return null;
+  return s;
+}
+
+/** The key a password stands for, in this group. */
+export function passKey(g: GroupKeys, password: string): KeyPair {
+  return keyPairFromSeed(concat(utf8("agora/v1/pass-key:"), g.groupId, utf8(password)));
+}
+
+/** A batch of new passwords: the event (public keys, signed by the organizer) and the passwords. */
+export function createPassBatch(
+  g: GroupKeys,
+  issuer: Issuer,
+  count: number,
+  now = Date.now(),
+): { event: PassBatch; passwords: string[] } {
+  const passwords = Array.from({ length: count }, newPassword);
+  const ev: PassBatch = {
+    t: "passes",
+    ts: now,
+    issuer: toB64u(issuer.pub),
+    keys: passwords.map((p) => toB64u(passKey(g, normalizePassword(p) as string).pub)).sort(),
+    nonce: toB64u(randomBytes(16)),
+    sig: "",
+  };
+  ev.sig = toB64u(issuerSign(issuer.secret, signedMessage(g.groupId, ev)));
+  return { event: ev, passwords };
+}
+
+/** The proof that we hold one of `batch`'s passwords, for our card. */
+export function passProof(
+  g: GroupKeys,
+  me: Me,
+  batch: PassBatch,
+  batchId: string,
+  password: string,
+): { batch: string; sig: string } {
+  const key = passKey(g, password);
+  const index = batch.keys.indexOf(toB64u(key.pub));
+  if (index < 0) throw new Error("password not in this batch");
+  const sig = ringSign(
+    passMessage(g.groupId, me.card),
+    batch.keys.map((k) => fromB64u(k)),
+    index,
+    key.secret,
+    passTag(g.groupId, batchId),
+  );
+  return { batch: batchId, sig: toB64u(sig) };
+}
+
 export function createAdmit(
   g: GroupKeys,
   me: Me,
-  proof: { vouches: Vouch[]; ticket?: { issuer: string; sig: string } },
+  proof: {
+    vouches: Vouch[];
+    ticket?: { issuer: string; sig: string };
+    pass?: { batch: string; sig: string };
+  },
   now = Date.now(),
 ): Admit {
   const ev: Admit = { t: "admit", ts: now, member: me.card, vouches: proof.vouches, sig: "" };
   if (proof.ticket) ev.ticket = proof.ticket;
+  if (proof.pass) ev.pass = proof.pass;
   ev.sig = toB64u(schnorrSign(DOMAIN.pop, me.sign.secret, signedMessage(g.groupId, ev)));
   return ev;
 }

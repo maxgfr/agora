@@ -5,7 +5,8 @@
  *  genesis  the founder creates the group: its name and admission policy
  *  request  a newcomer asks one member (named by them) to vouch, boxed to that member
  *  vouch    a member vouches for a newcomer's card (scanned in person or pasted)
- *  admit    a newcomer's keys, with k vouches from members or a blind ticket
+ *  passes   an organizer's batch of one-time entry passwords (their public keys only)
+ *  admit    a newcomer's keys, with k vouches, a blind ticket, or an entry password
  *  poll     a question, signed anonymously by a member over a frozen ring
  *  vote     a choice, ring-signed under the poll's tag (one image per member)
  *  action   a collective action: it is on once `threshold` members pledge
@@ -81,12 +82,32 @@ export interface VouchEvent {
   sig: string;
 }
 
+/**
+ * One-time entry passwords, made by an organizer. Each password derives a ristretto key; only
+ * the public keys are published, signed by the organizer. A newcomer proves they hold one of
+ * them with a linkable ring signature over the batch: the key image spends that password, and
+ * the organizer, who knows whom they gave which password, cannot tell which one was used.
+ */
+export interface PassBatch {
+  t: "passes";
+  ts: number;
+  /** The organizer's BLS public key (one of the policy's issuers). */
+  issuer: string;
+  /** Sorted, unique public keys of the passwords. */
+  keys: string[];
+  nonce: string;
+  /** The organizer's BLS signature over the event. */
+  sig: string;
+}
+
 export interface Admit {
   t: "admit";
   ts: number;
   member: MemberCard;
   vouches: Vouch[];
   ticket?: { issuer: string; sig: string };
+  /** An entry password: its batch, and a ring signature over the batch's keys. */
+  pass?: { batch: string; sig: string };
   sig: string;
 }
 
@@ -153,6 +174,7 @@ export interface KeyEvent {
 export type AgoraEvent =
   | Genesis
   | RequestEvent
+  | PassBatch
   | VouchEvent
   | Admit
   | Poll
@@ -166,6 +188,7 @@ export type EventType = AgoraEvent["t"];
 export const CONTROL: ReadonlySet<EventType> = new Set([
   "genesis",
   "request",
+  "passes",
   "vouch",
   "admit",
   "key",
@@ -225,6 +248,17 @@ export function voteTag(groupId: Uint8Array, pollId: string): Bytes {
 
 export function pledgeTag(groupId: Uint8Array, actionId: string): Bytes {
   return concat(utf8("agora/v1/tag/pledge:"), groupId, utf8(actionId));
+}
+
+export function passTag(groupId: Uint8Array, batchId: string): Bytes {
+  return concat(utf8("agora/v1/tag/pass:"), groupId, utf8(batchId));
+}
+
+/** What an entry password's ring signature covers: the newcomer it lets in. */
+export function passMessage(groupId: Uint8Array, card: MemberCard): Bytes {
+  return sha256(
+    concat(utf8("agora/v1/pass"), groupId, fromB64u(card.key), fromB64u(card.box)),
+  ) as Bytes;
 }
 
 export function requestContext(groupId: Uint8Array): Bytes {
@@ -308,8 +342,16 @@ export function parseEvent(raw: unknown): AgoraEvent | null {
       if (!e.vouches.every((v) => isObj(v) && isKey(v.by) && isBin(v.sig, 64))) return null;
       const t = e.ticket;
       if (t !== undefined && !(isObj(t) && isBin(t.issuer, 96) && isBin(t.sig, 48))) return null;
-      if (e.vouches.length === 0 && t === undefined) return null;
+      const ps = e.pass;
+      if (ps !== undefined && !(isObj(ps) && isText(ps.batch, 32, 32) && isBin(ps.sig)))
+        return null;
+      if (e.vouches.length === 0 && t === undefined && ps === undefined) return null;
       return raw as unknown as Admit;
+    }
+    case "passes": {
+      if (!isBin(e.issuer, 96) || !isRing(e.keys) || !isBin(e.nonce, 16) || !isBin(e.sig, 48))
+        return null;
+      return raw as unknown as PassBatch;
     }
     case "poll": {
       if (!isText(e.q, MAX_TEXT, 1) || typeof e.multi !== "boolean" || !isInt(e.closes))

@@ -348,3 +348,65 @@ test("a request whose signature does not match its card is ignored", async () =>
   expect(a.s.requests.value.map((r) => r.card.key)).toEqual([mallory.s.me.card.key]);
   for (const d of [a, mallory, other]) d.s.close();
 });
+
+test("entry passwords: made by the organizer, typed by newcomers, each good once", async () => {
+  const { record, genesis } = foundGroup({
+    name: "Passwords",
+    about: "",
+    vouches: 0,
+    organizer: true,
+    memberName: "Ada",
+  });
+  const a = device(record);
+  await a.s.start();
+  await a.s.publish(genesis);
+  const passwords = await a.s.createPasswords(2);
+  expect(a.s.record.passwords?.[0]?.codes).toEqual(passwords);
+  const inv = {
+    secret: Uint8Array.from(Buffer.from(record.secret, "base64url")),
+    genesisId: record.genesisId,
+  };
+  const b = device(joinRecord(inv));
+  await b.s.start();
+  await until(() => (b.s.view.value?.passBatches.length ?? 0) === 1);
+  await expect(b.s.usePassword("ABCD-EFGH-JKMN", 0)).rejects.toThrow("unknown");
+  await expect(b.s.usePassword("nope", 0)).rejects.toThrow("unknown");
+  // Typed loosely: lower case, spaces.
+  await b.s.usePassword((passwords[0] as string).toLowerCase().replaceAll("-", " "), 0);
+  await until(() => !!b.s.view.value?.me && a.s.view.value?.members.length === 2);
+  const c = device(joinRecord(inv));
+  await c.s.start();
+  await until(() => c.s.view.value?.passBatches[0]?.used === 1);
+  await expect(c.s.usePassword(passwords[0] as string, 0)).rejects.toThrow("used");
+  await c.s.usePassword(passwords[1] as string, 0);
+  await until(() => a.s.view.value?.members.length === 3);
+  expect(a.s.view.value?.passBatches[0]?.used).toBe(2);
+  for (const d of [a, b, c]) d.s.close();
+}, 20_000);
+
+test("joining now (skipping the delay) keeps the password's proof", async () => {
+  const { record, genesis } = foundGroup({
+    name: "Now",
+    about: "",
+    vouches: 0,
+    organizer: true,
+    memberName: "Ada",
+  });
+  const a = device(record);
+  await a.s.start();
+  await a.s.publish(genesis);
+  const [password] = await a.s.createPasswords(1);
+  const inv = {
+    secret: Uint8Array.from(Buffer.from(record.secret, "base64url")),
+    genesisId: record.genesisId,
+  };
+  const b = device(joinRecord(inv));
+  await b.s.start();
+  await until(() => (b.s.view.value?.passBatches.length ?? 0) === 1);
+  await b.s.usePassword(password as string, 60_000);
+  expect(b.s.record.pendingAdmit).toBeDefined();
+  await b.s.admitNow();
+  await until(() => !!b.s.view.value?.me && a.s.view.value?.members.length === 2);
+  expect(b.s.record.pendingAdmit).toBeUndefined();
+  for (const d of [a, b]) d.s.close();
+}, 20_000);

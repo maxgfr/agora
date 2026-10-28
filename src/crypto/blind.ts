@@ -95,3 +95,21 @@ export function verifyTicket(
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Plain (non-blind) organizer signatures: an organizer vouches for a batch of entry passwords.
+
+const ISSUER_DST = "AGORA-V1-ISSUER_BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_";
+
+export function issuerSign(issuerSecret: Uint8Array, msg: Uint8Array): Bytes {
+  return BLS.sign(BLS.hash(msg, ISSUER_DST), issuerSecret).toBytes() as Bytes;
+}
+
+export function issuerVerify(issuerPub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean {
+  if (sig.length !== TICKET_LEN || issuerPub.length !== ISSUER_PUB_LEN) return false;
+  try {
+    return BLS.verify(sig, BLS.hash(msg, ISSUER_DST), issuerPub);
+  } catch {
+    return false;
+  }
+}

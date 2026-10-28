@@ -4,13 +4,15 @@
  * device. Ring checks can be handed to a worker (`ringCheck`), so the page
  * stays responsive while a large backlog is verified.
  */
-import { verifyTicket } from "../crypto/blind";
+import { issuerVerify, verifyTicket } from "../crypto/blind";
 import { ringVerify, schnorrVerify } from "../crypto/ristretto";
 import { fromB64u } from "../lib/bytes";
 import {
   type AgoraEvent,
   createTag,
   DOMAIN,
+  passMessage,
+  passTag,
   pledgeTag,
   signedMessage,
   validChoice,
@@ -66,8 +68,21 @@ export function plan(
           if (!verifyTicket(fromB64u(t.sig), groupId, fromB64u(ev.member.key), fromB64u(t.issuer)))
             return false;
         }
+        if (ev.pass) {
+          const batch = lookup(ev.pass.batch);
+          if (!batch) return "pending";
+          if (batch.t !== "passes") return false;
+          return {
+            msg: passMessage(groupId, ev.member),
+            ring: keys(batch.keys),
+            sig: fromB64u(ev.pass.sig),
+            tag: passTag(groupId, ev.pass.batch),
+          };
+        }
         return true;
       }
+      case "passes":
+        return issuerVerify(fromB64u(ev.issuer), msg, sig);
       case "key":
         return schnorrVerify(DOMAIN.key, fromB64u(ev.by), msg, sig);
       case "poll":

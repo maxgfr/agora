@@ -6,7 +6,7 @@
  */
 import { signal } from "@preact/signals";
 import { type Issuer, issuerFromSecret, newIssuer, signBlinded, unblind } from "../crypto/blind";
-import { schnorrVerify } from "../crypto/ristretto";
+import { keyImage, schnorrVerify } from "../crypto/ristretto";
 import { boxOpen, type GroupKeys, groupKeys, open as openSealed, seal } from "../crypto/seal";
 import { fromB64u, fromUtf8, randomBytes, toB64u, toHex, utf8 } from "../lib/bytes";
 import type { SignalConfig, TransportFactory } from "../signal/mux";
@@ -17,6 +17,7 @@ import {
   createAdmit,
   createGenesis,
   createKeyEvent,
+  createPassBatch,
   createPledge,
   createPoll,
   createRequest,
@@ -24,6 +25,9 @@ import {
   createVouchEvent,
   type Me,
   meFromSeed,
+  normalizePassword,
+  passKey,
+  passProof,
   ticketRequest,
 } from "./author";
 import type { Invitation } from "./codes";
@@ -36,6 +40,7 @@ import {
   type Genesis,
   type MemberCard,
   parseEvent,
+  passTag,
   type RequestEvent,
   requestContext,
   signedMessage,
@@ -58,6 +63,8 @@ export interface GroupRecord {
   memberName?: string;
   /** Organizer keys held on this device (BLS secrets), with how many tickets each signed. */
   organizer?: { secret: string; served: number }[];
+  /** Entry passwords made on this device (organizer), to show again. */
+  passwords?: { batch: string; codes: string[]; at: number }[];
   /** A blind ticket request waiting for the organizer's answer. */
   ticket?: { issuer: string; factor: string; request: string };
   /** Pseudonyms of the members we asked to vouch for us. */
@@ -521,6 +528,39 @@ export class GroupSession {
    * Unblinds the organizer's answer and schedules our admission: after `delayMs` (random by
    * default, so the organizer cannot match the admission to the moment they signed).
    */
+  /**
+   * Uses an entry password: finds the organizer's batch it belongs to and schedules our
+   * admission (after `delayMs`, like a ticket). Throws "unknown" (not a password of this group,
+   * or its batch has not arrived yet) or "used".
+   */
+  async usePassword(text: string, delayMs: number): Promise<void> {
+    const password = normalizePassword(text);
+    if (!password) throw new Error("unknown");
+    const key = toB64u(passKey(this.g, password).pub);
+    const found = this.view.value?.passBatches.find((b) => b.batch.keys.includes(key));
+    if (!found) throw new Error("unknown");
+    const secret = passKey(this.g, password).secret;
+    const image = toHex(keyImage(secret, passTag(this.g.groupId, found.id)));
+    if (found.spent.has(image)) throw new Error("used");
+    const pass = passProof(this.g, this.me, found.batch, found.id, password);
+    const at = Date.now() + delayMs;
+    const ev = createAdmit(this.g, this.me, { vouches: [], pass }, at);
+    this.updateRecord({ pendingAdmit: { at, event: JSON.stringify(ev) } });
+    this.scheduleAdmit();
+  }
+
+  /** Organizer side: makes `count` one-time entry passwords and publishes their batch. */
+  async createPasswords(count: number): Promise<string[]> {
+    const org = this.organizer();
+    if (!org) throw new Error("not an organizer");
+    const { event, passwords } = createPassBatch(this.g, org, count);
+    const batch = await this.publish(event);
+    this.updateRecord({
+      passwords: [...(this.record.passwords ?? []), { batch, codes: passwords, at: event.ts }],
+    });
+    return passwords;
+  }
+
   async acceptTicket(answer: Uint8Array, delayMs: number): Promise<void> {
     const t = this.record.ticket;
     if (!t) throw new Error("no ticket request");
@@ -569,6 +609,7 @@ export class GroupSession {
     const ev = createAdmit(this.g, this.me, {
       vouches: held.vouches,
       ...(held.ticket ? { ticket: held.ticket } : {}),
+      ...(held.pass ? { pass: held.pass } : {}),
     });
     await this.publish(ev);
     this.updateRecord({ pendingAdmit: undefined });

@@ -27,10 +27,13 @@ or the organizer sees who voted what. agora keeps both properties at once:
     is ever shown) and their request, boxed to that member alone, shows up on the member's
     device as a pending request; or they show a QR code that members scan. Either way the two
     compare five emojis, and the newcomer's device admits itself once it has `k` vouches.
-  - **Organizer tickets**: the organizer checks the person (ID at the door, a membership list…),
-    then signs their ticket request *blind* (BLS on BLS12-381). The organizer knows who got a
-    ticket, but cannot link it to the member key it admits; the admission is published after a
-    random delay so its timing does not give it away either.
+  - **Entry passwords from an organizer**: the organizer checks the person (ID at the door, a
+    membership list…) and gives them a one-time password like `K7MQ-4XRT-9WHC`, out loud, on
+    paper or by message. The newcomer types it and is in. Only the passwords' public keys are
+    published; the newcomer proves they hold one of them with a linkable ring signature, so the
+    organizer knows whom they gave a password to, never which one let in which member. (A blind
+    BLS ticket exchanged by QR code is still there, as another way.) The admission is published
+    after a short random delay, counted down, so its timing does not give it away either.
 - **Polls**: single or multiple choice, a closing time, live results. You can change your vote
   until it closes. The ring of possible voters is frozen when the poll is created.
 - **Collective actions**: "I'm in if at least N members are." Commitments are anonymous and
