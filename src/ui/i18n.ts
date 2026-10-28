@@ -250,6 +250,12 @@ const fr = {
     "Elle demande un ticket depuis l'appli et vous montre sa demande : signez-la au guichet ci-dessous.",
   showQr: "Afficher le QR code",
   hideQr: "Masquer le QR code",
+  forgotPassphrase: "Phrase de passe oubliée ?",
+  forgotPassphraseHint:
+    "Elle ne peut pas être retrouvée : sans elle, vos groupes et vos clés sur cet appareil sont illisibles. Vous pouvez tout effacer et recommencer (vous devrez être réinvité et réadmis).",
+  youWereExcluded: "Vous avez été exclu de ce groupe",
+  youWereExcludedHint:
+    "Une motion d'exclusion a été adoptée. Vous ne pouvez plus voter, et ce qui est publié dans le groupe désormais vous est illisible.",
   groupNotFound: "Groupe introuvable",
   groupNotFoundHint:
     "Ce groupe n'est pas sur cet appareil. Pour le rejoindre, ouvrez son lien d'invitation.",
@@ -496,6 +502,12 @@ const en: Dict = {
     "They ask for a ticket in the app and show you their request: sign it at the desk below.",
   showQr: "Show the QR code",
   hideQr: "Hide the QR code",
+  forgotPassphrase: "Forgot the passphrase?",
+  forgotPassphraseHint:
+    "It cannot be recovered: without it, your groups and keys on this device cannot be read. You can erase everything and start over (you will need to be invited and admitted again).",
+  youWereExcluded: "You were excluded from this group",
+  youWereExcludedHint:
+    "A motion to exclude passed. You can no longer vote, and what the group says from now on cannot be read by you.",
   groupNotFound: "Group not found",
   groupNotFoundHint: "This group is not on this device. To join it, open its invitation link.",
 };

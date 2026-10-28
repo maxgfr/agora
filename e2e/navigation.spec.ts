@@ -85,18 +85,26 @@ test("an invitation leaves the address bar at once", async ({ browser }) => {
   await close(ada, bob);
 });
 
-test("a second tab steps aside and can take over", async ({ browser }) => {
+test("the tab in front is the active one; an inactive tab takes over when looked at", async ({
+  browser,
+}) => {
   const ada = await person(browser, "ada");
   await open(ada);
   await found(ada, "Club");
+  const elsewhere = "agora is open in another tab";
+  // A tab opened in front (say, from a link) takes over at once.
   const second = await ada.ctx.newPage();
   await second.goto(`${BASE}/?nosw`);
-  await expect(second.getByRole("heading", { name: "agora is open in another tab" })).toBeVisible();
+  await expect(second.getByTestId("groups")).toContainText("Club");
+  await expect(ada.page.getByRole("heading", { name: elsewhere })).toBeVisible();
+  // Back to the first tab: it takes over again by itself, no button to press.
+  await ada.page.bringToFront();
+  await ada.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(ada.page.getByTestId("group-name")).toHaveText("Club");
+  await expect(second.getByRole("heading", { name: elsewhere })).toBeVisible();
+  // The button still works where focus cannot be told.
   await second.getByRole("button", { name: "Use this tab" }).click();
   await expect(second.getByTestId("groups")).toContainText("Club");
-  await expect(
-    ada.page.getByRole("heading", { name: "agora is open in another tab" }),
-  ).toBeVisible();
   await close(ada);
 });
 

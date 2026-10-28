@@ -21,5 +21,15 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: { PORT: String(PORT) },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Headless Chromium hides local addresses behind mDNS names it cannot always resolve
+        // itself: with them visible, two test browsers on one machine connect peer to peer.
+        launchOptions: { args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] },
+      },
+    },
+  ],
 });

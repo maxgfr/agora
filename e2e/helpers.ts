@@ -5,7 +5,7 @@ export const HOST = `localhost:${PORT}`;
 export const BASE = `http://${HOST}`;
 
 /** Local relay only, no tracker, no STUN: tests never touch the public network. */
-export function settingsJson(): string {
+export function settingsJson(extra: Record<string, unknown> = {}): string {
   return JSON.stringify({
     relays: [`ws://${HOST}/relay`],
     trackers: [`ws://${HOST}/tracker`],
@@ -14,6 +14,7 @@ export function settingsJson(): string {
     stun: [],
     turn: null,
     relayOnly: false,
+    ...extra,
   });
 }
 
@@ -24,7 +25,11 @@ export interface Person {
   errors: string[];
 }
 
-export async function person(browser: Browser, name: string): Promise<Person> {
+export async function person(
+  browser: Browser,
+  name: string,
+  settings: Record<string, unknown> = {},
+): Promise<Person> {
   const ctx = await browser.newContext({ locale: "en-US" });
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
   await ctx.addInitScript(
@@ -38,7 +43,7 @@ export async function person(browser: Browser, name: string): Promise<Person> {
         // about:blank (going back past the app's first page) has no storage
       }
     },
-    { s: settingsJson() },
+    { s: settingsJson(settings) },
   );
   const page = await ctx.newPage();
   const errors: string[] = [];

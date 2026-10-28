@@ -37,7 +37,12 @@ interface Tracker {
   detail?: string;
   attempt: number;
   timer?: ReturnType<typeof setTimeout>;
+  /** Envelopes sent while offline, delivered once connected (a hello must not be lost). */
+  queue: { at: number; msg: string }[];
 }
+
+/** How long an envelope waits for a tracker to come online. */
+const QUEUE_TTL_MS = 30_000;
 
 interface TrackerMessage {
   action?: string;
@@ -75,6 +80,7 @@ export class TorrentTransport implements SignalTransport {
       ws: null,
       state: "connecting",
       attempt: 0,
+      queue: [],
     }));
     for (const t of this.trackers) this.connect(t);
     this.interval = setInterval(() => {
@@ -101,6 +107,9 @@ export class TorrentTransport implements SignalTransport {
       t.attempt = 0;
       delete t.detail;
       for (const hash of this.topics.keys()) this.announce(t, hash, "started");
+      const now = Date.now();
+      for (const q of t.queue) if (now - q.at < QUEUE_TTL_MS) ws.send(q.msg);
+      t.queue = [];
       this.emit();
     };
     ws.onmessage = (e) => this.onMessage(t, e.data);
@@ -119,8 +128,12 @@ export class TorrentTransport implements SignalTransport {
     this.emit();
   }
 
-  private sendTo(t: Tracker, msg: unknown): void {
+  private sendTo(t: Tracker, msg: unknown, queue = false): void {
     if (t.state === "online" && t.ws) t.ws.send(JSON.stringify(msg));
+    else if (queue && !this.closed) {
+      t.queue.push({ at: Date.now(), msg: JSON.stringify(msg) });
+      if (t.queue.length > 32) t.queue.shift();
+    }
   }
 
   private announce(t: Tracker, hash: string, event?: "started" | "stopped"): void {
@@ -172,26 +185,34 @@ export class TorrentTransport implements SignalTransport {
     const hash = infoHash(topic);
     for (const t of this.trackers) {
       if (to) {
-        this.sendTo(t, {
-          action: "announce",
-          info_hash: hash,
-          peer_id: this.peerId,
-          to_peer_id: to,
-          offer_id: toB64u(randomBytes(15)),
-          answer: { type: "answer", sdp: wire },
-        });
+        this.sendTo(
+          t,
+          {
+            action: "announce",
+            info_hash: hash,
+            peer_id: this.peerId,
+            to_peer_id: to,
+            offer_id: toB64u(randomBytes(15)),
+            answer: { type: "answer", sdp: wire },
+          },
+          true,
+        );
       } else {
         const offers = Array.from({ length: FANOUT }, () => ({
           offer_id: toB64u(randomBytes(15)),
           offer: { type: "offer", sdp: wire },
         }));
-        this.sendTo(t, {
-          action: "announce",
-          info_hash: hash,
-          peer_id: this.peerId,
-          numwant: FANOUT,
-          offers,
-        });
+        this.sendTo(
+          t,
+          {
+            action: "announce",
+            info_hash: hash,
+            peer_id: this.peerId,
+            numwant: FANOUT,
+            offers,
+          },
+          true,
+        );
       }
     }
   }
