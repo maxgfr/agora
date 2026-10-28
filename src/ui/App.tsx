@@ -89,7 +89,14 @@ export function App(): JSX.Element {
       )}
       <main class="page">
         {p === "loading" && <div class="spinner" aria-hidden="true" />}
-        {p === "error" && <p class="error">{t("bootError")}</p>}
+        {p === "error" && (
+          <div class="stack narrow">
+            <p class="error">{t("bootError")}</p>
+            <button type="button" class="btn btn-primary" onClick={() => location.reload()}>
+              {t("retry")}
+            </button>
+          </div>
+        )}
         {p === "locked" && <Locked />}
         {p === "elsewhere" && (
           <div class="stack narrow">

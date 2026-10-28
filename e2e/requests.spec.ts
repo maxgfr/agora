@@ -33,12 +33,17 @@ test("a newcomer asks a member by name; the member vouches from the pending requ
   await join(bob, fragment, "Bob");
   // No list of members is shown: Bob types the name himself.
   await expect(bob.page.getByTestId("members")).toHaveCount(0);
+  // A name nobody has reads as sent too: the form never tells who is in the group.
   await bob.page.getByTestId("ask-member").fill("Zed");
   await bob.page.getByRole("button", { name: "Send the request" }).click();
-  await expect(bob.page.getByText("No member of this group goes by that pseudonym.")).toBeVisible();
+  await expect(bob.page.getByTestId("asked")).toHaveText("Request sent to Zed · pending");
+  await expect(bob.page.getByRole("alert")).toHaveCount(0);
   await bob.page.getByTestId("ask-member").fill("ada");
   await bob.page.getByRole("button", { name: "Send the request" }).click();
-  await expect(bob.page.getByTestId("asked")).toHaveText("Request sent to Ada · pending");
+  await expect(bob.page.getByTestId("asked").locator("li")).toHaveText([
+    "Request sent to Zed · pending",
+    "Request sent to ada · pending",
+  ]);
 
   // Ada is told, wherever she is in the group, and vouches in one tap.
   await expect(ada.page.getByText("1 pending vouch request(s) →")).toBeVisible({ timeout: 30_000 });
