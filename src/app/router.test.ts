@@ -13,11 +13,12 @@ test("every route round-trips through its URL", () => {
     { name: "group", id: g },
     { name: "group", id: g, tab: "actions" },
     { name: "group", id: g, tab: "members" },
-    { name: "group", id: g, tab: "invite" },
     { name: "group", id: g, tab: "polls", item: p },
   ];
   for (const r of routes) expect(hashToRoute(routeToHash(r))).toEqual(r);
   expect(routeToHash({ name: "group", id: g, tab: "polls" })).toBe(`#/g/${g}`);
+  // Links from before inviting moved into the members tab still land there.
+  expect(hashToRoute(`#/g/${g}/invite`)).toEqual({ name: "group", id: g, tab: "members" });
 });
 
 test("anything else is not a route", () => {

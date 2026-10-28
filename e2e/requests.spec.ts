@@ -45,9 +45,11 @@ test("a newcomer asks a member by name; the member vouches from the pending requ
     "Request sent to ada · pending",
   ]);
 
-  // Ada is told, wherever she is in the group, and vouches in one tap.
+  // Ada is told wherever she is in the group, and vouches in one tap from the members tab.
+  await tab(ada, "Polls");
   await expect(ada.page.getByText("1 pending vouch request(s) →")).toBeVisible({ timeout: 30_000 });
   await ada.page.getByText("1 pending vouch request(s) →").click();
+  await expect(ada.page).toHaveURL(/\/members$/);
   const request = ada.page.getByTestId("request");
   await expect(request.locator(".person-name")).toHaveText("Bob");
   // The emojis match on both screens.
@@ -90,7 +92,7 @@ test("the app-wide scanner opens invitations, cards and ticket codes", async ({ 
   await dan.page.getByRole("button", { name: "Ask for a ticket" }).click();
   const request = await text(dan, "ticket-request");
   await scan(ada, request);
-  await expect(ada.page).toHaveURL(/\/invite$/);
+  await expect(ada.page).toHaveURL(/\/members$/);
   await expect(ada.page.getByTestId("request-input")).toHaveValue(request);
   await ada.page.getByRole("button", { name: "Sign the ticket" }).click();
   const answer = await text(ada, "ticket-answer-code");

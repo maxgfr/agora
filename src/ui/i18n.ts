@@ -53,7 +53,6 @@ const fr = {
   tabPolls: "Sondages",
   tabActions: "Actions",
   tabMembers: "Membres",
-  tabInvite: "Inviter",
   relaysOnline: "Relais connectés",
   relaysOffline: "Relais hors ligne",
   peers: "{n} pair(s) en direct",
@@ -129,9 +128,7 @@ const fr = {
   actionHint:
     "Les engagements sont anonymes : on voit combien de membres s'engagent, jamais qui. Chacun ne compte qu'une fois.",
   // Members
-  vouchSomeone: "Parrainer quelqu'un",
-  vouchSomeoneHint:
-    "Scannez ou collez le code de la personne. Ne parrainez que quelqu'un que vous avez identifié : vous engagez votre nom.",
+  vouchSomeoneHint: "Ne parrainez que quelqu'un que vous avez identifié : vous engagez votre nom.",
   invalidCard: "Ce n'est pas un code de membre agora.",
   personCode: "Code de la personne",
   checkPerson: "Vérifiez avec la personne",
@@ -163,7 +160,8 @@ const fr = {
     "Pour signer depuis un autre appareil ou confier le guichet à un co-organisateur. Gardez-la secrète : elle permet d'admettre des membres.",
   importOrganizer: "Importer une clé d'organisateur",
   invalidOrganizer: "Ce n'est pas une clé d'organisateur de ce groupe.",
-  show: "Afficher",
+  checkCard: "Vérifier la carte",
+  pasteTheirCode: "Coller son code",
   // Settings
   language: "Langue",
   lockTitle: "Verrou de l'appareil",
@@ -242,6 +240,16 @@ const fr = {
   diagStorage: "Erreurs de stockage : {n}",
   diagReconnects: "Reconnexions après mise en veille : {n}",
   diagCopy: "Copier le rapport",
+  addPeople: "Ajouter quelqu'un",
+  stepInvite: "1. Envoyez-lui le lien d'invitation",
+  stepVouch: "2. Parrainez-la",
+  stepVouchHint:
+    "Elle vous le demande depuis l'appli (sa demande apparaît en haut de cette page), ou vous scannez sa carte avec le bouton Scanner, ou vous collez son code ici.",
+  stepTicket: "2. Signez-lui un ticket",
+  stepTicketHint:
+    "Elle demande un ticket depuis l'appli et vous montre sa demande : signez-la au guichet ci-dessous.",
+  showQr: "Afficher le QR code",
+  hideQr: "Masquer le QR code",
   groupNotFound: "Groupe introuvable",
   groupNotFoundHint:
     "Ce groupe n'est pas sur cet appareil. Pour le rejoindre, ouvrez son lien d'invitation.",
@@ -299,7 +307,6 @@ const en: Dict = {
   tabPolls: "Polls",
   tabActions: "Actions",
   tabMembers: "Members",
-  tabInvite: "Invite",
   relaysOnline: "Relays connected",
   relaysOffline: "Relays offline",
   peers: "{n} live peer(s)",
@@ -370,9 +377,7 @@ const en: Dict = {
   youPledged: "You are committed.",
   actionHint:
     "Commitments are anonymous: everyone sees how many members are in, never who. Each counts once.",
-  vouchSomeone: "Vouch for someone",
-  vouchSomeoneHint:
-    "Scan or paste the person's code. Only vouch for someone you have identified: your name is on it.",
+  vouchSomeoneHint: "Only vouch for someone you have identified: your name is on it.",
   invalidCard: "This is not an agora member code.",
   personCode: "The person's code",
   checkPerson: "Check with the person",
@@ -403,7 +408,8 @@ const en: Dict = {
     "To sign from another device or hand the desk to a co-organizer. Keep it secret: it admits members.",
   importOrganizer: "Import an organizer key",
   invalidOrganizer: "This is not an organizer key of this group.",
-  show: "Show",
+  checkCard: "Check the card",
+  pasteTheirCode: "Paste their code",
   language: "Language",
   lockTitle: "Device lock",
   lockHint:
@@ -480,6 +486,16 @@ const en: Dict = {
   diagStorage: "Storage errors: {n}",
   diagReconnects: "Reconnections after sleep: {n}",
   diagCopy: "Copy the report",
+  addPeople: "Add someone",
+  stepInvite: "1. Send them the invitation link",
+  stepVouch: "2. Vouch for them",
+  stepVouchHint:
+    "They ask you from the app (their request shows at the top of this page), or you scan their card with the Scan button, or paste their code here.",
+  stepTicket: "2. Sign them a ticket",
+  stepTicketHint:
+    "They ask for a ticket in the app and show you their request: sign it at the desk below.",
+  showQr: "Show the QR code",
+  hideQr: "Hide the QR code",
   groupNotFound: "Group not found",
   groupNotFoundHint: "This group is not on this device. To join it, open its invitation link.",
 };

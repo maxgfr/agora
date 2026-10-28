@@ -4,7 +4,6 @@ import type { GroupSession } from "../../model/session";
 import { Link } from "../components/Link";
 import { Actions } from "../group/Actions";
 import { Admission } from "../group/Admission";
-import { Invite } from "../group/Invite";
 import { Members } from "../group/Members";
 import { PollDetail, Polls } from "../group/Polls";
 import { t } from "../i18n";
@@ -13,7 +12,6 @@ const TABS: [GroupTab, Parameters<typeof t>[0]][] = [
   ["polls", "tabPolls"],
   ["actions", "tabActions"],
   ["members", "tabMembers"],
-  ["invite", "tabInvite"],
 ];
 
 function Status(props: { s: GroupSession }): JSX.Element {
@@ -96,7 +94,6 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
             ))}
           {tab === "actions" && <Actions s={s} view={view} />}
           {tab === "members" && <Members s={s} view={view} />}
-          {tab === "invite" && <Invite s={s} view={view} />}
         </>
       )}
       <div class="danger-zone">

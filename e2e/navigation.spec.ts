@@ -22,9 +22,9 @@ test("every screen has its own URL; back, forward and reload follow it", async (
 
   await found(ada, "Club");
   // The creation form is replaced in the history: back from the group goes home.
-  await expect(page).toHaveURL(/#\/g\/[0-9a-f]{32}\/invite$/);
+  await expect(page).toHaveURL(/#\/g\/[0-9a-f]{32}\/members$/);
   await expect(page).toHaveTitle("Club · agora");
-  const groupHash = new URL(page.url()).hash.replace(/\/invite$/, "");
+  const groupHash = new URL(page.url()).hash.replace(/\/members$/, "");
 
   await tab(ada, "Members");
   await expect(page).toHaveURL(/\/members$/);
@@ -97,5 +97,21 @@ test("a second tab steps aside and can take over", async ({ browser }) => {
   await expect(
     ada.page.getByRole("heading", { name: "agora is open in another tab" }),
   ).toBeVisible();
+  await close(ada);
+});
+
+test("links to the old invite tab open the members tab", async ({ browser }) => {
+  const ada = await person(browser, "ada");
+  await open(ada);
+  await found(ada, "Club");
+  const hash = new URL(ada.page.url()).hash.replace(/\/members$/, "/invite");
+  await ada.page.goto(`${BASE}/?nosw&old${hash}`);
+  await expect(ada.page).toHaveURL(/\/members$/);
+  await expect(ada.page.getByTestId("add-people")).toBeVisible();
+  await expect(ada.page.getByRole("navigation").getByRole("link")).toHaveText([
+    "Polls",
+    "Actions",
+    "Members",
+  ]);
   await close(ada);
 });

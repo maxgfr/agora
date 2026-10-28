@@ -7,7 +7,7 @@
  *   #/join                     join (paste an invitation)
  *   #/settings
  *   #/g/<group>                a group, on its polls
- *   #/g/<group>/<tab>          actions, members, invite
+ *   #/g/<group>/<tab>          actions, members (`invite`, from older links, opens members)
  *   #/g/<group>/polls/<poll>   one poll
  *
  * An invitation (`#g=…`) is not a route: it is read once, kept in memory and
@@ -16,7 +16,7 @@
  */
 import type { Invitation } from "../model/codes";
 
-export type GroupTab = "polls" | "actions" | "members" | "invite";
+export type GroupTab = "polls" | "actions" | "members";
 
 export type Route =
   | { name: "home" }
@@ -25,7 +25,7 @@ export type Route =
   | { name: "group"; id: string; tab?: GroupTab; item?: string }
   | { name: "settings" };
 
-const TABS: readonly GroupTab[] = ["polls", "actions", "members", "invite"];
+const TABS: readonly string[] = ["polls", "actions", "members", "invite"];
 const ID = /^[0-9a-f]{32}$/;
 
 export function routeToHash(r: Route): string {
@@ -56,8 +56,9 @@ export function hashToRoute(hash: string): Route | null {
   if (parts[0] !== "g" || !ID.test(parts[1] ?? "")) return null;
   const id = parts[1] as string;
   if (parts.length === 2) return { name: "group", id };
-  const tab = parts[2] as GroupTab;
-  if (!TABS.includes(tab)) return null;
+  if (!TABS.includes(parts[2] ?? "")) return null;
+  // Inviting moved into the members tab.
+  const tab = (parts[2] === "invite" ? "members" : parts[2]) as GroupTab;
   if (parts.length === 3) return { name: "group", id, tab };
   if (parts.length === 4 && tab === "polls" && ID.test(parts[3] ?? ""))
     return { name: "group", id, tab, item: parts[3] as string };

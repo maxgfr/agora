@@ -15,8 +15,9 @@ test("a signature checker that never answers does not freeze the group", async (
   await bob.page.getByRole("button", { name: "Join", exact: true }).click();
   const card = await text(bob, "my-card");
   await tab(ada, "Members");
+  await ada.page.getByText("Paste their code", { exact: true }).click();
   await ada.page.getByTestId("card-input").fill(card);
-  await ada.page.getByRole("button", { name: "Show" }).click();
+  await ada.page.getByRole("button", { name: "Check the card" }).click();
   await ada.page.getByTestId("confirm-vouch").click();
   await expect(bob.page.getByRole("navigation").getByRole("link", { name: "Polls" })).toBeVisible();
 

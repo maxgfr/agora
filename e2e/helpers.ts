@@ -61,7 +61,7 @@ export async function text(p: Person, testId: string): Promise<string> {
   return ((await el.textContent()) ?? "").trim();
 }
 
-export async function tab(p: Person, name: "Polls" | "Actions" | "Members" | "Invite") {
+export async function tab(p: Person, name: "Polls" | "Actions" | "Members") {
   await p.page.getByRole("navigation").getByRole("link", { name, exact: true }).click();
 }
 
