@@ -754,3 +754,54 @@ a.tab {
   display: inline-flex;
   align-items: center;
 }
+.grow {
+  flex: 1;
+  min-width: 18ch;
+}
+.fingerprint-inline {
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.notice-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 560;
+}
+.notice-link:hover {
+  background: color-mix(in oklch, var(--ochre-soft) 100%, var(--ochre) 10%);
+}
+.requests {
+  border-color: color-mix(in oklch, var(--ochre) 45%, var(--line));
+}
+
+/* The app-wide scanner */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: oklch(0.15 0.01 160 / 0.45);
+  backdrop-filter: blur(2px);
+}
+.sheet {
+  width: min(100%, 520px);
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  outline: none;
+}
+@media (min-width: 640px) {
+  .sheet-backdrop {
+    align-items: center;
+  }
+  .sheet {
+    border-radius: var(--radius);
+  }
+}

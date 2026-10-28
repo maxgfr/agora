@@ -58,6 +58,11 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
         {genesis?.about && <p class="lead">{genesis.about}</p>}
         <Status s={s} />
       </div>
+      {view?.me && s.requests.value.length > 0 && tab !== "members" && (
+        <Link to={{ name: "group", id: props.id, tab: "members" }} class="notice notice-link">
+          {t("requestsCount", { n: s.requests.value.length })} →
+        </Link>
+      )}
       {!view || !genesis ? (
         <div class="card center stack">
           <div class="spinner" aria-hidden="true" />

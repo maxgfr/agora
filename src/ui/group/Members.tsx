@@ -7,6 +7,7 @@ import type { GroupView, MemberView } from "../../model/group";
 import type { GroupSession } from "../../model/session";
 import { CodeInput } from "../components/Codes";
 import { useAction } from "../components/useAction";
+import { useIntent } from "../components/useIntent";
 import { t } from "../i18n";
 import { memberName } from "./Polls";
 
@@ -15,6 +16,16 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
   const [card, setCard] = useState<MemberCard | null>(null);
   const [done, setDone] = useState(false);
   const { busy, error, run } = useAction();
+  const [scanError, setScanError] = useState<string | null>(null);
+  // A card read by the app's scanner lands here, ready to confirm.
+  useIntent(s.record.id, "card", (i) => {
+    setDone(false);
+    if (view.members.some((m) => m.key === i.card.key)) setScanError(t("alreadyMember"));
+    else {
+      setScanError(null);
+      setCard(i.card);
+    }
+  });
   return (
     <section class="card stack">
       <h2>{t("vouchSomeone")}</h2>
@@ -24,14 +35,21 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
           {t("vouched")}
         </p>
       )}
+      {scanError && (
+        <p class="error" role="alert">
+          {scanError}
+        </p>
+      )}
       {!card ? (
         <CodeInput
           label={t("personCode")}
           submit={t("show")}
           testId="card-input"
           onCode={(text) => {
-            const c = parseCard(text);
-            if (!c) return t("invalidCard");
+            const parsed = parseCard(text);
+            if (!parsed) return t("invalidCard");
+            if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
+            const c = parsed.value;
             if (view.members.some((m) => m.key === c.key)) return t("alreadyMember");
             setDone(false);
             setCard(c);
@@ -78,6 +96,55 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
   );
 }
 
+/** Newcomers who asked this member, by name, to vouch for them. */
+function Requests(props: { s: GroupSession }): JSX.Element | null {
+  const { s } = props;
+  const list = s.requests.value;
+  const { busy, error, run } = useAction();
+  if (list.length === 0) return null;
+  return (
+    <section class="card stack requests" data-testid="requests">
+      <h2>
+        {t("requestsTitle")} · {list.length}
+      </h2>
+      <p class="hint">{t("requestsHint")}</p>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+      <ul class="list-plain stack">
+        {list.map((r) => (
+          <li key={r.card.key} class="stack-tight" data-testid="request">
+            <p class="person">
+              <span class="person-name">{r.card.name ?? t("unnamed")}</span>
+              <span class="fingerprint">{fingerprint(r.card)}</span>
+            </p>
+            <div class="row">
+              <button
+                type="button"
+                class="btn btn-primary"
+                disabled={busy}
+                onClick={() => void run(() => s.vouch(r.card))}
+              >
+                {t("vouchFor", { name: r.card.name ?? t("unnamed") })}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                disabled={busy}
+                onClick={() => s.dismissRequest(r.card.key)}
+              >
+                {t("ignore")}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function via(view: GroupView, m: MemberView): string {
   if (m.via === "founder") return t("viaFounder");
   if (m.via === "ticket") return t("viaTicket");
@@ -90,6 +157,7 @@ export function Members(props: { s: GroupSession; view: GroupView }): JSX.Elemen
   const motionOpen = (key: string) => view.polls.some((p) => p.poll.exclude === key && !p.closed);
   return (
     <div class="stack">
+      {view.policy && view.policy.vouches > 0 && <Requests s={s} />}
       {view.policy && view.policy.vouches > 0 && <VouchSomeone s={s} view={view} />}
       <section class="stack">
         <h2>

@@ -2,8 +2,12 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { FakePC } from "../../test/fake-rtc";
 import { MemoryBus } from "../../test/memory-transport";
 import { serveApp } from "../../test/serve";
+import { schnorrSign } from "../crypto/ristretto";
+import { boxSeal } from "../crypto/seal";
 import type { SignalConfig } from "../signal/mux";
+import { createRequest } from "./author";
 import { inviteFragment, parseInvite } from "./codes";
+import { DOMAIN, type RequestEvent, requestContext, signedMessage } from "./events";
 import { foundGroup, type GroupRecord, GroupSession, joinRecord, type NetOptions } from "./session";
 import { MemoryStore } from "./store";
 import { inlineRingCheck } from "./verify";
@@ -55,12 +59,13 @@ describe("sessions over a relay", () => {
     if (!inv) return;
 
     // Bob joins with a vouch: Ada scans his card, his device admits itself.
-    const b = device(joinRecord(inv, "bob"));
+    // Long and unique: a short name could turn up by chance in base64 ciphertext.
+    const b = device(joinRecord(inv, "bob-the-neighbour"));
     await b.s.start();
     await until(() => b.s.view.value?.genesis?.name === "Résidence");
     await a.s.vouch(b.s.me.card);
     await until(() => !!b.s.view.value?.me);
-    expect(b.s.view.value?.members.map((m) => m.name)).toEqual(["ada", "bob"]);
+    expect(b.s.view.value?.members.map((m) => m.name)).toEqual(["ada", "bob-the-neighbour"]);
 
     // Carol joins with a blind ticket, anonymously.
     const c = device(joinRecord(inv));
@@ -95,7 +100,7 @@ describe("sessions over a relay", () => {
     // The relay only ever saw ciphertext under a random-looking tag.
     for (const ev of server.relay.seen) {
       expect(ev.content).not.toContain("Repeindre");
-      expect(ev.content).not.toContain("bob");
+      expect(ev.content).not.toContain("bob-the-neighbour");
     }
     for (const d of [a, b, c]) d.s.close();
   }, 30_000);
@@ -253,3 +258,92 @@ test("our own vote shows at once, even behind a backlog of signatures to check",
   expect(c.s.verifying.value).not.toBeNull();
   for (const d of [a, b, c]) d.s.close();
 }, 20_000);
+
+test("a newcomer asks a member by name; only that member sees it and vouches in one go", async () => {
+  const { record, genesis } = foundGroup({
+    name: "Ask",
+    about: "",
+    vouches: 1,
+    organizer: false,
+    memberName: "Ada",
+  });
+  const a = device(record);
+  await a.s.start();
+  await a.s.publish(genesis);
+  const inv = {
+    secret: Uint8Array.from(Buffer.from(record.secret, "base64url")),
+    genesisId: record.genesisId,
+  };
+  const carol = device(joinRecord(inv, "carol"));
+  await carol.s.start();
+  await until(() => !!carol.s.view.value?.genesis);
+  await a.s.vouch(carol.s.me.card);
+  await until(() => !!carol.s.view.value?.me);
+
+  const bob = device(joinRecord(inv, "bob-the-newcomer"));
+  await bob.s.start();
+  await until(() => bob.s.view.value?.members.length === 2);
+  expect(await bob.s.requestVouch("nobody")).toBe(0);
+  // Typed by the newcomer, case and spaces aside.
+  expect(await bob.s.requestVouch("  ada ")).toBe(1);
+  expect(bob.s.record.asked).toEqual(["Ada"]);
+  await until(() => a.s.requests.value.length === 1);
+  expect(a.s.requests.value[0]?.card).toEqual(bob.s.me.card);
+  // Carol, another member, sees nothing: the request is boxed to Ada.
+  await new Promise((r) => setTimeout(r, 300));
+  expect(carol.s.requests.value).toEqual([]);
+  // The relay never saw bob's name.
+  for (const ev of server.relay.seen) expect(ev.content).not.toContain("bob-the-newcomer");
+
+  await a.s.vouch(a.s.requests.value[0]?.card as typeof bob.s.me.card);
+  expect(a.s.requests.value).toEqual([]);
+  await until(() => !!bob.s.view.value?.me);
+  for (const d of [a, bob, carol]) d.s.close();
+}, 20_000);
+
+test("a request whose signature does not match its card is ignored", async () => {
+  const { record, genesis } = foundGroup({
+    name: "Forge",
+    about: "",
+    vouches: 1,
+    organizer: false,
+    memberName: "Ada",
+  });
+  const a = device(record, { offline: true });
+  await a.s.start();
+  await a.s.publish(genesis);
+  const inv = {
+    secret: Uint8Array.from(Buffer.from(record.secret, "base64url")),
+    genesisId: record.genesisId,
+  };
+  const mallory = device(joinRecord(inv, "mallory"), { offline: true });
+  await mallory.s.start();
+  for (const w of await a.store.wires(record.id)) await mallory.s.ingest(w, true);
+  await until(() => mallory.s.view.value?.members.length === 1);
+  // A request carrying someone else's card under mallory's signature.
+  const victim = joinRecord(inv, "victim");
+  const other = device(victim, { offline: true });
+  // Mallory boxes the victim's card and signs the event correctly, but with her own key.
+  const box = boxSeal(
+    Buffer.from(a.s.me.card.box, "base64url"),
+    new TextEncoder().encode(JSON.stringify({ card: other.s.me.card })),
+    requestContext(a.s.g.groupId),
+  );
+  const forged: RequestEvent = {
+    t: "request",
+    ts: Date.now(),
+    to: a.s.me.card.box,
+    box: Buffer.from(box).toString("base64url"),
+    sig: "",
+  };
+  forged.sig = Buffer.from(
+    schnorrSign(DOMAIN.pop, mallory.s.me.sign.secret, signedMessage(a.s.g.groupId, forged)),
+  ).toString("base64url");
+  await mallory.s.publish(forged);
+  // The same request made properly does show (so the check above is what stops the forgery).
+  await mallory.s.publish(createRequest(mallory.s.g, mallory.s.me, a.s.me.card));
+  for (const w of await mallory.store.wires(record.id)) await a.s.ingest(w, true);
+  await until(() => a.s.requests.value.length === 1);
+  expect(a.s.requests.value.map((r) => r.card.key)).toEqual([mallory.s.me.card.key]);
+  for (const d of [a, mallory, other]) d.s.close();
+});

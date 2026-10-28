@@ -6,7 +6,8 @@
  */
 import { signal } from "@preact/signals";
 import { type Issuer, issuerFromSecret, newIssuer, signBlinded, unblind } from "../crypto/blind";
-import { type GroupKeys, groupKeys, open as openSealed, seal } from "../crypto/seal";
+import { schnorrVerify } from "../crypto/ristretto";
+import { boxOpen, type GroupKeys, groupKeys, open as openSealed, seal } from "../crypto/seal";
 import { fromB64u, fromUtf8, randomBytes, toB64u, toHex, utf8 } from "../lib/bytes";
 import type { SignalConfig, TransportFactory } from "../signal/mux";
 import { LOG_KIND, NostrTransport } from "../signal/nostr";
@@ -18,6 +19,7 @@ import {
   createKeyEvent,
   createPledge,
   createPoll,
+  createRequest,
   createVote,
   createVouchEvent,
   type Me,
@@ -27,11 +29,16 @@ import {
 import type { Invitation } from "./codes";
 import {
   type AgoraEvent,
+  asCard,
   CONTROL,
+  DOMAIN,
   eventId,
   type Genesis,
   type MemberCard,
   parseEvent,
+  type RequestEvent,
+  requestContext,
+  signedMessage,
   type Vouch,
 } from "./events";
 import { currentRing, fold, type GroupView } from "./group";
@@ -53,11 +60,21 @@ export interface GroupRecord {
   organizer?: { secret: string; served: number }[];
   /** A blind ticket request waiting for the organizer's answer. */
   ticket?: { issuer: string; factor: string; request: string };
+  /** Pseudonyms of the members we asked to vouch for us. */
+  asked?: string[];
+  /** Keys of newcomers whose request we set aside. */
+  dismissed?: string[];
   /** Our admission, ready, published at `at` (a delay unlinks it from the ticket's signing). */
   pendingAdmit?: { at: number; event: string };
   joinedAt: number;
   /** When this device last had the relays' history (seconds), to ask only for what is newer. */
   syncedAt?: number;
+}
+
+/** A newcomer who asked us, by name, to vouch for them (checked: they hold the card's key). */
+export interface IncomingRequest {
+  card: MemberCard;
+  ts: number;
 }
 
 export interface NetOptions {
@@ -91,6 +108,8 @@ export class GroupSession {
   readonly verifying = signal<{ done: number; total: number } | null>(null);
   /** Vouches published for our card (while we are not a member yet). */
   readonly vouches = signal<Vouch[]>([]);
+  /** Newcomers asking us to vouch for them (only while we are a member). */
+  readonly requests = signal<IncomingRequest[]>([]);
   /** Bumped whenever the record changes (pending ticket, scheduled admission…). */
   readonly recordRev = signal(0);
 
@@ -99,6 +118,8 @@ export class GroupSession {
   private readonly sealed = new Set<string>();
   private readonly verifier: Verifier;
   private readonly images = new Map<string, string>();
+  /** Requests addressed to us, opened once: the card inside, or null if it does not check. */
+  private readonly opened = new Map<string, MemberCard | null>();
   private nostr: NostrTransport | null = null;
   private swarm: Swarm | null = null;
   private recomputing = false;
@@ -274,6 +295,7 @@ export class GroupSession {
             if (!this.sealed.has(wire) && this.tryOpen(wire)) this.again = true;
         }
         this.collectVouches(valid);
+        this.collectRequests();
       } while (this.again && !this.closed);
     } finally {
       this.recomputing = false;
@@ -340,6 +362,77 @@ export class GroupSession {
       void this.admitWithVouches();
   }
 
+  private openRequest(id: string, ev: RequestEvent): MemberCard | null {
+    if (this.opened.has(id)) return this.opened.get(id) ?? null;
+    let card: MemberCard | null = null;
+    const plain = boxOpen(this.me.box.secret, fromB64u(ev.box), requestContext(this.g.groupId));
+    if (plain) {
+      try {
+        card = asCard((JSON.parse(fromUtf8(plain)) as { card?: unknown }).card);
+      } catch {
+        card = null;
+      }
+      const msg = signedMessage(this.g.groupId, ev);
+      if (card && !schnorrVerify(DOMAIN.pop, fromB64u(card.key), msg, fromB64u(ev.sig)))
+        card = null;
+    }
+    this.opened.set(id, card);
+    return card;
+  }
+
+  private collectRequests(): void {
+    const view = this.view.value;
+    if (!view?.me) {
+      if (this.requests.value.length) this.requests.value = [];
+      return;
+    }
+    const known = new Set([...view.members, ...view.excluded].map((m) => m.key));
+    const dismissed = new Set(this.record.dismissed ?? []);
+    const vouched = new Set<string>();
+    for (const ev of this.events.values())
+      if (ev.t === "vouch" && ev.by === this.me.card.key) vouched.add(ev.for.key);
+    const out = new Map<string, IncomingRequest>();
+    for (const [id, ev] of this.events) {
+      if (ev.t !== "request" || ev.to !== this.me.card.box) continue;
+      const card = this.openRequest(id, ev);
+      if (!card || known.has(card.key) || vouched.has(card.key) || dismissed.has(card.key))
+        continue;
+      const prev = out.get(card.key);
+      if (!prev || ev.ts > prev.ts) out.set(card.key, { card, ts: ev.ts });
+    }
+    const list = [...out.values()].sort((a, b) => a.ts - b.ts);
+    const same =
+      list.length === this.requests.value.length &&
+      list.every((r, i) => r.card.key === this.requests.value[i]?.card.key);
+    if (!same) this.requests.value = list;
+  }
+
+  /**
+   * Asks the member(s) going by `name` (typed by the newcomer: no list of members is shown)
+   * to vouch for us. Returns how many members got the request (0: nobody by that name).
+   */
+  async requestVouch(name: string): Promise<number> {
+    const view = this.view.value;
+    const wanted = name.trim().toLocaleLowerCase();
+    if (!view || !wanted) return 0;
+    const targets = view.members.filter(
+      (m) => m.key !== this.me.card.key && m.name?.trim().toLocaleLowerCase() === wanted,
+    );
+    for (const t of targets) await this.publish(createRequest(this.g, this.me, t));
+    if (targets.length > 0) {
+      const asked = new Set(this.record.asked ?? []);
+      asked.add((targets[0] as MemberCard).name as string);
+      this.updateRecord({ asked: [...asked] });
+    }
+    return targets.length;
+  }
+
+  /** Sets a newcomer's request aside (on this device). */
+  dismissRequest(key: string): void {
+    this.updateRecord({ dismissed: [...new Set([...(this.record.dismissed ?? []), key])] });
+    this.collectRequests();
+  }
+
   /** Vouches a newcomer needs right now (0 when vouching is off). */
   vouchesNeeded(): number {
     const v = this.view.value;
@@ -380,9 +473,11 @@ export class GroupSession {
     return view;
   }
 
-  vouch(card: MemberCard): Promise<string> {
+  async vouch(card: MemberCard): Promise<string> {
     this.requireMember();
-    return this.publish(createVouchEvent(this.g, this.me, card));
+    const id = await this.publish(createVouchEvent(this.g, this.me, card));
+    this.collectRequests();
+    return id;
   }
 
   private async admitWithVouches(): Promise<void> {

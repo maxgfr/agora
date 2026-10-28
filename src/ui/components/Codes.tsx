@@ -1,7 +1,7 @@
 /** Showing a code (QR + text + copy) and taking one (paste or scan). */
 import type { JSX } from "preact";
 import { lazy, Suspense } from "preact/compat";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { t } from "../i18n";
 import { QrCode } from "./QrCode";
 
@@ -64,8 +64,15 @@ export function CodeInput(props: {
   submit: string;
   testId: string;
   onCode: (text: string) => string | null | Promise<string | null>;
+  /** Fills the field (a code the app's scanner read for this screen). */
+  prefill?: string | null;
+  /** No camera button (the camera is already open around this field). */
+  noScan?: boolean;
 }): JSX.Element {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(props.prefill ?? "");
+  useEffect(() => {
+    if (props.prefill) setText(props.prefill);
+  }, [props.prefill]);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -118,7 +125,7 @@ export function CodeInput(props: {
         <button type="submit" class="btn btn-primary" disabled={busy || !text.trim()}>
           {props.submit}
         </button>
-        {!scanning && (
+        {!scanning && !props.noScan && (
           <button type="button" class="btn btn-ghost" onClick={() => setScanning(true)}>
             {t("scan")}
           </button>

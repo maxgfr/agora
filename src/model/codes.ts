@@ -2,11 +2,13 @@
  * What people pass to each other by hand, as links, QR codes or text:
  *
  *   invitation  https://…/agora/#g=<secret>.<genesis id>  (the secret never reaches a server)
- *   card        AC1.<key ‖ box ‖ name>     a newcomer's keys, to be vouched for
- *   request     AT1.<blinded point>        a blind ticket request, for an organizer
- *   answer      AS1.<blind signature>      the organizer's answer
- *   organizer   AO1.<BLS secret>           an organizer key, for a co-organizer's device
+ *   card        AC2.<group ‖ key ‖ box ‖ name>   a newcomer's keys, to be vouched for
+ *   request     AT2.<group ‖ blinded point>      a blind ticket request, for an organizer
+ *   answer      AS2.<group ‖ blind signature>    the organizer's answer
+ *   organizer   AO2.<group ‖ BLS secret>         an organizer key, for a co-organizer's device
  *
+ * `group` is the 16-byte group id (not a secret): it lets the app's scanner open
+ * the right group. Version 1 codes (`AC1.` …, without it) are still read.
  * Fingerprints (5 emojis) let two people compare a card over a call.
  */
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -53,13 +55,37 @@ function prefixed(prefix: string, text: string): Uint8Array | null {
   }
 }
 
-export function cardCode(card: MemberCard): string {
-  return `AC1.${toB64u(concat(fromB64u(card.key), fromB64u(card.box), utf8(card.name ?? "")))}`;
+/** A code, and the group it names (absent in version 1 codes). */
+export interface Scoped<T> {
+  value: T;
+  groupId?: string;
 }
 
-export function parseCard(text: string): MemberCard | null {
-  const b = prefixed("AC1.", text);
-  if (!b || b.length < 64 || b.length > 64 + 256) return null;
+const GID = 16;
+
+function scoped(v1: string, v2: string, text: string): Scoped<Uint8Array> | null {
+  const b2 = prefixed(v2, text);
+  if (b2)
+    return b2.length > GID ? { value: b2.slice(GID), groupId: toHex(b2.subarray(0, GID)) } : null;
+  const b1 = prefixed(v1, text);
+  return b1 ? { value: b1 } : null;
+}
+
+const withGroup = (prefix: string, groupId: string, data: Uint8Array) =>
+  `${prefix}${toB64u(concat(fromHex(groupId), data))}`;
+
+export function cardCode(card: MemberCard, groupId: string): string {
+  return withGroup(
+    "AC2.",
+    groupId,
+    concat(fromB64u(card.key), fromB64u(card.box), utf8(card.name ?? "")),
+  );
+}
+
+export function parseCard(text: string): Scoped<MemberCard> | null {
+  const s = scoped("AC1.", "AC2.", text);
+  const b = s?.value;
+  if (!s || !b || b.length < 64 || b.length > 64 + 256) return null;
   try {
     const card: MemberCard = {
       key: toB64u(b.subarray(0, 32)),
@@ -67,26 +93,51 @@ export function parseCard(text: string): MemberCard | null {
     };
     const name = fromUtf8(b.subarray(64)).trim();
     if (name) card.name = name.slice(0, 64);
-    return card;
+    return s.groupId ? { value: card, groupId: s.groupId } : { value: card };
   } catch {
     return null;
   }
 }
 
-export const requestCode = (request: Uint8Array) => `AT1.${toB64u(request)}`;
-export const answerCode = (answer: Uint8Array) => `AS1.${toB64u(answer)}`;
-export const organizerCode = (secret: Uint8Array) => `AO1.${toB64u(secret)}`;
+export const requestCode = (groupId: string, request: Uint8Array) =>
+  withGroup("AT2.", groupId, request);
+export const answerCode = (groupId: string, answer: Uint8Array) =>
+  withGroup("AS2.", groupId, answer);
+export const organizerCode = (groupId: string, secret: Uint8Array) =>
+  withGroup("AO2.", groupId, secret);
 
-function fixed(prefix: string, len: number) {
-  return (text: string): Uint8Array | null => {
-    const b = prefixed(prefix, text);
-    return b && b.length === len ? b : null;
+function fixed(v1: string, v2: string, len: number) {
+  return (text: string): Scoped<Uint8Array> | null => {
+    const s = scoped(v1, v2, text);
+    return s && s.value.length === len ? s : null;
   };
 }
 
-export const parseRequest = fixed("AT1.", 48);
-export const parseAnswer = fixed("AS1.", 48);
-export const parseOrganizer = fixed("AO1.", 32);
+export const parseRequest = fixed("AT1.", "AT2.", 48);
+export const parseAnswer = fixed("AS1.", "AS2.", 48);
+export const parseOrganizer = fixed("AO1.", "AO2.", 32);
+
+/** Whatever the app's scanner read. */
+export type ScannedCode =
+  | { kind: "invite"; invite: Invitation }
+  | { kind: "card"; code: Scoped<MemberCard> }
+  | { kind: "request" | "answer" | "organizer"; code: Scoped<Uint8Array> };
+
+export function classifyCode(text: string): ScannedCode | null {
+  const invite = parseInvite(text);
+  if (invite) return { kind: "invite", invite };
+  const card = parseCard(text);
+  if (card) return { kind: "card", code: card };
+  for (const [kind, parse] of [
+    ["request", parseRequest],
+    ["answer", parseAnswer],
+    ["organizer", parseOrganizer],
+  ] as const) {
+    const code = parse(text);
+    if (code) return { kind, code };
+  }
+  return null;
+}
 
 const EMOJI = [
   ..."🍎🍊🍋🍉🍇🍓🍒🍑🥝🥥🥑🍆🥕🌽🌶🥦🍄🥜🌰🍞🧀🥚🍕🍔🌮🍩🍪🎂🍫🍿🧁🍯🐶🐱🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🐔🐧🐦🦆🦉🐺🐴🦄🐝🦋🐌🐞🐢🐍🐙🦀🐬🐳🌵🌻⭐",

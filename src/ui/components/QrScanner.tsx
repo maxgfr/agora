@@ -15,6 +15,8 @@ type DetectorCtor = new (opts: { formats: string[] }) => Detector;
 export function QrScanner(props: {
   onResult: (text: string) => void;
   onCancel: () => void;
+  /** Hidden where the surrounding sheet has its own close button. */
+  showCancel?: boolean;
 }): JSX.Element {
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +102,11 @@ export function QrScanner(props: {
           <div class="scanner-reticle" aria-hidden="true" />
         </div>
       )}
-      <button type="button" class="btn btn-ghost" onClick={props.onCancel}>
-        {t("cancel")}
-      </button>
+      {props.showCancel !== false && (
+        <button type="button" class="btn btn-ghost" onClick={props.onCancel}>
+          {t("cancel")}
+        </button>
+      )}
     </div>
   );
 }

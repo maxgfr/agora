@@ -45,7 +45,7 @@ Plaintext is at most 96 KiB. On the wire a sealed event is base64url. Its **wire
 `SHA-256(canonical(event))[0..16]`, hex, where `canonical` is JSON with sorted keys; ids name
 polls and actions independently of how they were sealed.
 
-`genesis`, `vouch`, `admit` and `key` events are sealed with the link key, so that a newcomer
+`genesis`, `request`, `vouch`, `admit` and `key` events are sealed with the link key, so that a newcomer
 holding only the invitation can follow admissions. Content events (`poll`, `vote`, `action`,
 `pledge`) are sealed with the newest key the author holds.
 
@@ -81,6 +81,10 @@ The requester picks `r`, sends `r·M`; the organizer returns `sk·r·M`; the req
 All carry `t` (type), `ts` (milliseconds) and `sig`. Binary fields are base64url.
 
 - `genesis {name, about, policy: {vouches, issuers[]}, founder: card, sig: pop}`
+- `request {to, box, sig: pop}` — a newcomer asks the member whose X25519 key is `to` to vouch:
+  `box = boxSeal(to, JSON {card}, "agora/v1/request:" ‖ groupId)`; `sig` is the newcomer's pop
+  signature, checked by the recipient against the key inside the box (nobody else can check it,
+  nor see who asks)
 - `vouch {for: card, by, sig: vouch}` — a vouch published for the newcomer's device to collect
 - `admit {member: card, vouches: [{by, sig}], ticket?: {issuer, sig}, sig: pop}`
 - `poll {q, options[2..20], multi, closes, ring[], nonce, exclude?, sig: LSAG(create)}`
@@ -112,6 +116,18 @@ Every device folds the events whose signatures check, deterministically
    (`box = eph ‖ nonce ‖ XChaCha20-Poly1305(HKDF(X25519(eph, to), eph ‖ to, "agora/v1/box"), nonce, "agora/v1/box:" ‖ groupId ‖ kid, key)`).
    After an exclusion, the first online member publishes a new key boxed to the remaining
    members; members admitted later get the current key in a further `key` event.
+
+## Codes passed by hand
+
+QR codes or text, each prefixed and base64url (`gid` is the 16-byte group id, so a scanner
+knows which group a code is for; version 1 codes have no `gid` and are still read):
+
+| Code | Content |
+| --- | --- |
+| `AC2.` card | `gid ‖ key ‖ box ‖ utf8(name)` |
+| `AT2.` ticket request | `gid ‖ r·M` (48 bytes) |
+| `AS2.` ticket answer | `gid ‖ sk·r·M` (48 bytes) |
+| `AO2.` organizer key | `gid ‖ BLS secret` (32 bytes) |
 
 ## Transport
 
