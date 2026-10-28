@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { fromB64u } from "../../lib/bytes";
 import { cardCode, fingerprint, parseAnswer, requestCode } from "../../model/codes";
 import type { GroupView } from "../../model/group";
@@ -7,11 +7,51 @@ import type { GroupSession } from "../../model/session";
 import { CodeBox, CodeInput } from "../components/Codes";
 import { useAction } from "../components/useAction";
 import { useIntent } from "../components/useIntent";
-import { t, when } from "../i18n";
+import { t } from "../i18n";
 
 /** Ten seconds to ten minutes: enough to blur the moment the ticket was signed. */
 function randomDelay(): number {
-  return 10_000 + Math.floor(Math.random() * 590_000);
+  return 10_000 + Math.floor(Math.random() * 170_000);
+}
+
+/** A delayed admission: a countdown (the wait is deliberate, not a frozen page), and a way out. */
+function AdmitCountdown(props: { s: GroupSession; at: number }): JSX.Element {
+  const [now, setNow] = useState(Date.now());
+  const { busy, error, run } = useAction();
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.max(0, Math.ceil((props.at - now) / 1000));
+  if (left === 0)
+    return (
+      <p class="notice" data-testid="admit-scheduled">
+        {t("admitPublishing")}
+      </p>
+    );
+  const mm = Math.floor(left / 60);
+  const ss = String(left % 60).padStart(2, "0");
+  return (
+    <div class="notice stack-tight" data-testid="admit-scheduled">
+      <p>
+        <strong>{t("admitCountdown", { t: `${mm}:${ss}` })}</strong>
+      </p>
+      <p class="small">{t("admitCountdownHint")}</p>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        class="btn btn-small"
+        disabled={busy}
+        onClick={() => void run(() => props.s.admitNow())}
+      >
+        {t("admitNow")}
+      </button>
+    </div>
+  );
 }
 
 /** The newcomer types the name of a member who knows them; no list of members is ever shown. */
@@ -84,15 +124,7 @@ function TicketPath(props: { s: GroupSession; view: GroupView }): JSX.Element {
   const rec = s.record;
   const issuers = props.view.policy?.issuers ?? [];
   const [delay, setDelay] = useState(true);
-  if (rec.pendingAdmit) {
-    return (
-      <p class="notice" data-testid="admit-scheduled">
-        {rec.pendingAdmit.at > Date.now()
-          ? t("admitScheduled", { t: when(rec.pendingAdmit.at) })
-          : t("admitPublishing")}
-      </p>
-    );
-  }
+  if (rec.pendingAdmit) return <AdmitCountdown s={s} at={rec.pendingAdmit.at} />;
   if (!rec.ticket) {
     return (
       <button

@@ -194,12 +194,19 @@ test("a co-organizer signs tickets with an exported organizer key", async ({ bro
   await bob.page.getByTestId("request-input").fill(request);
   await bob.page.getByRole("button", { name: "Sign the ticket" }).click();
   const answer = await text(bob, "ticket-answer-code");
-  // Left checked: the admission waits a random delay, and says so.
+  // Left checked: the admission waits a random delay, counts it down, and can be hurried.
   await carol.page.getByTestId("ticket-answer").fill(answer);
   await carol.page.getByRole("button", { name: "Use the ticket" }).click();
-  await expect(carol.page.getByTestId("admit-scheduled")).toContainText(
-    "Valid ticket. Your admission will be published around",
-  );
+  const wait = carol.page.getByTestId("admit-scheduled");
+  await expect(wait).toContainText(/Valid ticket: you join the group in \d+:\d\d/);
+  const first = await wait.textContent();
+  await expect(wait).not.toHaveText(first ?? "", { timeout: 3000 });
+  await carol.page.getByRole("button", { name: "Join now" }).click();
+  await admitted(carol);
+  await tab(ada, "Members");
+  await expect(ada.page.getByTestId("members").locator(".member")).toHaveCount(3, {
+    timeout: 20_000,
+  });
   await close(ada, bob, carol);
 });
 
