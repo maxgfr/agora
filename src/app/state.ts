@@ -99,6 +99,9 @@ function fromLocation(): void {
     return;
   }
   if (r.name === "join" && pendingInvite) r.invite = pendingInvite;
+  // An older spelling of the same screen (#/g/…/invite): show the current one.
+  if (r.name !== "join" && routeToHash(r) !== location.hash && location.hash.length > 1)
+    history.replaceState(null, "", routeToHash(r));
   route.value = r;
   document.title = titleOf(r);
 }
@@ -165,8 +168,12 @@ export function handleScan(text: string): Key | null {
     code.kind === "card"
       ? { groupId: rec.id, kind: "card", card: code.code.value }
       : ({ groupId: rec.id, kind: code.kind, text } as ScanIntent);
-  const tab = code.kind === "card" ? "members" : code.kind === "answer" ? undefined : "invite";
-  go(tab ? { name: "group", id: rec.id, tab } : { name: "group", id: rec.id });
+  // Cards, ticket requests and organizer keys are all handled in the members tab.
+  go(
+    code.kind === "answer"
+      ? { name: "group", id: rec.id }
+      : { name: "group", id: rec.id, tab: "members" },
+  );
   return null;
 }
 

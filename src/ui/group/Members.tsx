@@ -10,8 +10,9 @@ import { useAction } from "../components/useAction";
 import { useIntent } from "../components/useIntent";
 import { t } from "../i18n";
 import { memberName } from "./Polls";
+import { InviteLink, TicketDesk } from "./Tickets";
 
-function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element {
+function VouchForm(props: { s: GroupSession; view: GroupView }): JSX.Element {
   const { s, view } = props;
   const [card, setCard] = useState<MemberCard | null>(null);
   const [done, setDone] = useState(false);
@@ -27,9 +28,7 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
     }
   });
   return (
-    <section class="card stack">
-      <h2>{t("vouchSomeone")}</h2>
-      <p class="hint">{t("vouchSomeoneHint")}</p>
+    <div class="stack">
       {done && (
         <p class="ok-line" role="status" data-testid="vouched">
           {t("vouched")}
@@ -41,21 +40,26 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
         </p>
       )}
       {!card ? (
-        <CodeInput
-          label={t("personCode")}
-          submit={t("show")}
-          testId="card-input"
-          onCode={(text) => {
-            const parsed = parseCard(text);
-            if (!parsed) return t("invalidCard");
-            if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
-            const c = parsed.value;
-            if (view.members.some((m) => m.key === c.key)) return t("alreadyMember");
-            setDone(false);
-            setCard(c);
-            return null;
-          }}
-        />
+        // Scanning goes through the header's Scan button; pasting is the rarer case.
+        <details class="paste">
+          <summary>{t("pasteTheirCode")}</summary>
+          <CodeInput
+            label={t("personCode")}
+            submit={t("checkCard")}
+            testId="card-input"
+            noScan
+            onCode={(text) => {
+              const parsed = parseCard(text);
+              if (!parsed) return t("invalidCard");
+              if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
+              const c = parsed.value;
+              if (view.members.some((m) => m.key === c.key)) return t("alreadyMember");
+              setDone(false);
+              setCard(c);
+              return null;
+            }}
+          />
+        </details>
       ) : (
         <div class="stack">
           <p>
@@ -92,7 +96,8 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
           </div>
         </div>
       )}
-    </section>
+      <p class="hint small">{t("vouchSomeoneHint")}</p>
+    </div>
   );
 }
 
@@ -145,6 +150,38 @@ function Requests(props: { s: GroupSession }): JSX.Element | null {
   );
 }
 
+/** Adding someone, in the order it happens: send the link, then let them in. */
+function AddPeople(props: { s: GroupSession; view: GroupView }): JSX.Element {
+  const { s, view } = props;
+  const vouching = (view.policy?.vouches ?? 0) > 0;
+  const tickets = (view.policy?.issuers.length ?? 0) > 0;
+  return (
+    <section class="card stack" data-testid="add-people">
+      <h2>{t("addPeople")}</h2>
+      <ol class="steps">
+        <li class="stack">
+          <h3>{t("stepInvite")}</h3>
+          <p class="hint">{t("inviteHint")}</p>
+          <InviteLink s={s} />
+        </li>
+        {vouching && (
+          <li class="stack">
+            <h3>{t("stepVouch")}</h3>
+            <p class="hint">{t("stepVouchHint")}</p>
+            <VouchForm s={s} view={view} />
+          </li>
+        )}
+        {!vouching && tickets && (
+          <li class="stack">
+            <h3>{t("stepTicket")}</h3>
+            <p class="hint">{t("stepTicketHint")}</p>
+          </li>
+        )}
+      </ol>
+    </section>
+  );
+}
+
 function via(view: GroupView, m: MemberView): string {
   if (m.via === "founder") return t("viaFounder");
   if (m.via === "ticket") return t("viaTicket");
@@ -158,7 +195,8 @@ export function Members(props: { s: GroupSession; view: GroupView }): JSX.Elemen
   return (
     <div class="stack">
       {view.policy && view.policy.vouches > 0 && <Requests s={s} />}
-      {view.policy && view.policy.vouches > 0 && <VouchSomeone s={s} view={view} />}
+      <AddPeople s={s} view={view} />
+      {view.policy && view.policy.issuers.length > 0 && <TicketDesk s={s} view={view} />}
       <section class="stack">
         <h2>
           {t("tabMembers")} · {view.members.length}

@@ -39,8 +39,9 @@ test("a group: vouching, a blind ticket, a poll, a changed vote and an action", 
   await expect(bob.page.getByTestId("group-name")).toHaveText("Building 12");
   const card = await text(bob, "my-card");
   await tab(ada, "Members");
+  await ada.page.getByText("Paste their code", { exact: true }).click();
   await ada.page.getByTestId("card-input").fill(card);
-  await ada.page.getByRole("button", { name: "Show" }).click();
+  await ada.page.getByRole("button", { name: "Check the card" }).click();
   await expect(ada.page.locator(".person-name")).toHaveText("bob");
   await ada.page.getByTestId("confirm-vouch").click();
   await expect(ada.page.getByTestId("vouched")).toBeVisible();
@@ -52,7 +53,7 @@ test("a group: vouching, a blind ticket, a poll, a changed vote and an action", 
   await carol.page.getByRole("button", { name: "Join", exact: true }).click();
   await carol.page.getByRole("button", { name: "Ask for a ticket" }).click();
   const request = await text(carol, "ticket-request");
-  await tab(ada, "Invite");
+  await tab(ada, "Members");
   await ada.page.getByTestId("request-input").fill(request);
   await ada.page.getByRole("button", { name: "Sign the ticket" }).click();
   const answer = await text(ada, "ticket-answer-code");

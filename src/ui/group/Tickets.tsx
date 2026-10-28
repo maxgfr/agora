@@ -14,7 +14,7 @@ import { CodeBox, CodeInput } from "../components/Codes";
 import { useIntent } from "../components/useIntent";
 import { t } from "../i18n";
 
-function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
+export function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
   const { s, view } = props;
   void s.recordRev.value;
   const [answer, setAnswer] = useState<string | null>(null);
@@ -96,17 +96,9 @@ function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
   );
 }
 
-export function Invite(props: { s: GroupSession; view: GroupView }): JSX.Element {
-  const { s, view } = props;
+/** The invitation link: its text first (to send), the QR code on demand (to show in person). */
+export function InviteLink(props: { s: GroupSession }): JSX.Element {
+  const { s } = props;
   const link = inviteLink({ secret: fromB64u(s.record.secret), genesisId: s.record.genesisId });
-  return (
-    <div class="stack">
-      <section class="card stack">
-        <h2>{t("inviteTitle")}</h2>
-        <p class="hint">{t("inviteHint")}</p>
-        <CodeBox code={link} label={t("inviteTitle")} testId="invite-link" share />
-      </section>
-      {view.policy && view.policy.issuers.length > 0 && <TicketDesk s={s} view={view} />}
-    </div>
-  );
+  return <CodeBox code={link} label={t("inviteTitle")} testId="invite-link" qr="toggle" share />;
 }

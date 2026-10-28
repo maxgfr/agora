@@ -30,7 +30,7 @@ export function CreateGroup(): JSX.Element {
         organizer: ticket,
         memberName: memberName.trim(),
       });
-      go({ name: "group", id, tab: "invite" }, { replace: true });
+      go({ name: "group", id, tab: "members" }, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);

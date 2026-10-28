@@ -33,24 +33,37 @@ export function CodeBox(props: {
   code: string;
   label: string;
   testId: string;
-  qr?: boolean;
+  /** "toggle": the QR code shows on demand (where the text is what people mostly use). */
+  qr?: boolean | "toggle";
   share?: boolean;
 }): JSX.Element {
+  const [shown, setShown] = useState(props.qr !== "toggle");
+  const canShare = typeof navigator !== "undefined" && "share" in navigator;
   return (
     <div class="codebox">
-      {props.qr !== false && <QrCode value={props.code} label={props.label} size={200} />}
+      {props.qr !== false && shown && <QrCode value={props.code} label={props.label} size={200} />}
       <code class="code-text" data-testid={props.testId}>
         {props.code}
       </code>
       <div class="row">
         <CopyButton text={props.code} />
-        {props.share && typeof navigator !== "undefined" && "share" in navigator && (
+        {props.share && canShare && (
           <button
             type="button"
             class="btn btn-small btn-ghost"
             onClick={() => void navigator.share({ text: props.code }).catch(() => {})}
           >
             {t("share")}
+          </button>
+        )}
+        {props.qr === "toggle" && (
+          <button
+            type="button"
+            class="btn btn-small btn-ghost"
+            aria-expanded={shown}
+            onClick={() => setShown(!shown)}
+          >
+            {shown ? t("hideQr") : t("showQr")}
           </button>
         )}
       </div>
