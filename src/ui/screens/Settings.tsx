@@ -1,7 +1,8 @@
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
 import { saveSettings, settings } from "../../app/settings";
-import { go, locked, restartSessions, setPassphrase, wipeAll } from "../../app/state";
+import { locked, restartSessions, setPassphrase, wipeAll } from "../../app/state";
+import { Link } from "../components/Link";
 import { lang, setLang, t } from "../i18n";
 
 const lines = (s: string) =>
@@ -35,10 +36,13 @@ function Lock(): JSX.Element {
           return;
         }
         setBusy(true);
-        await setPassphrase(a);
-        setBusy(false);
-        setA("");
-        setB("");
+        try {
+          await setPassphrase(a);
+          setA("");
+          setB("");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <label class="field">
@@ -80,13 +84,9 @@ export function SettingsScreen(): JSX.Element {
 
   return (
     <div class="stack narrow">
-      <button
-        type="button"
-        class="btn btn-ghost btn-small back"
-        onClick={() => go({ name: "home" })}
-      >
+      <Link to={{ name: "home" }} class="btn btn-ghost btn-small back">
         ← {t("back")}
-      </button>
+      </Link>
       <h1>{t("settings")}</h1>
       <section class="card stack">
         <h2>{t("language")}</h2>
@@ -122,7 +122,7 @@ export function SettingsScreen(): JSX.Element {
             relayOnly,
             turn: turn.url.trim() ? { ...turn, url: turn.url.trim() } : null,
           });
-          await restartSessions();
+          restartSessions();
           setSaved(true);
           setTimeout(() => setSaved(false), 1500);
         }}

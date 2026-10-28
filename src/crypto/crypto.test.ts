@@ -11,7 +11,7 @@ import {
   schnorrVerify,
 } from "./ristretto";
 import { boxKeyPair, boxOpen, boxSeal, groupKeys, keyId, open, pad, seal, unpad } from "./seal";
-import { lock, unlock } from "./vault";
+import { lock, newVaultKey, openVault, sealVault, unlock } from "./vault";
 
 const members = Array.from({ length: 6 }, () => keyPairFromSeed(randomBytes(32)));
 const ring = members.map((m) => m.pub);
@@ -151,6 +151,16 @@ describe("seal", () => {
 });
 
 describe("vault", () => {
+  test("a key derived once seals every save, and the passphrase opens them", async () => {
+    const vk = await newVaultKey("correct horse");
+    for (const text of ["first", "second"]) {
+      const { data, vk: again } = await openVault("correct horse", sealVault(vk, utf8(text)));
+      expect(new TextDecoder().decode(data)).toBe(text);
+      expect(again.key).toEqual(vk.key);
+    }
+    await expect(openVault("wrong", sealVault(vk, utf8("x")))).rejects.toThrow();
+  });
+
   test("locks and unlocks; a wrong passphrase fails", async () => {
     const blob = await lock("correct horse", utf8("secret"));
     expect(new TextDecoder().decode(await unlock("correct horse", blob))).toBe("secret");

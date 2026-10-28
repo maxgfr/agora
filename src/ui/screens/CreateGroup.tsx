@@ -2,6 +2,7 @@ import type { JSX } from "preact";
 import { useState } from "preact/hooks";
 import { createGroup, go } from "../../app/state";
 import { MAX_MEMBERS } from "../../model/events";
+import { Link } from "../components/Link";
 import { t } from "../i18n";
 
 export function CreateGroup(): JSX.Element {
@@ -29,7 +30,7 @@ export function CreateGroup(): JSX.Element {
         organizer: ticket,
         memberName: memberName.trim(),
       });
-      go({ name: "group", id, tab: "invite" });
+      go({ name: "group", id, tab: "invite" }, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -38,13 +39,9 @@ export function CreateGroup(): JSX.Element {
 
   return (
     <form class="stack narrow" onSubmit={submit}>
-      <button
-        type="button"
-        class="btn btn-ghost btn-small back"
-        onClick={() => go({ name: "home" })}
-      >
+      <Link to={{ name: "home" }} class="btn btn-ghost btn-small back">
         ← {t("back")}
-      </button>
+      </Link>
       <h1>{t("createGroup")}</h1>
       <label class="field">
         <span>{t("groupName")}</span>

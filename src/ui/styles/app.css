@@ -740,3 +740,17 @@ details[open] summary {
 .card > .btn {
   align-self: flex-start;
 }
+.banner-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+a.btn,
+a.tile,
+a.tab,
+a.brand {
+  text-decoration: none;
+}
+a.tab {
+  display: inline-flex;
+  align-items: center;
+}

@@ -196,6 +196,16 @@ const fr = {
   never: "jamais",
   cameraUnavailable: "Caméra indisponible. Collez le code à la place.",
   cameraPreview: "Aperçu de la caméra pour scanner un QR code",
+  saveFailed: "Impossible d'enregistrer sur cet appareil (stockage plein ou indisponible).",
+  elsewhereTitle: "agora est ouvert dans un autre onglet",
+  elsewhereHint:
+    "Un seul onglet à la fois, pour que deux onglets n'écrasent pas vos groupes. Fermez l'autre, ou utilisez celui-ci.",
+  useHere: "Utiliser cet onglet",
+  actionFailed: "Échec",
+  pollNotHere: "Ce sondage n'est pas (encore) arrivé sur cet appareil.",
+  groupNotFound: "Groupe introuvable",
+  groupNotFoundHint:
+    "Ce groupe n'est pas sur cet appareil. Pour le rejoindre, ouvrez son lien d'invitation.",
 };
 
 type Dict = typeof fr;
@@ -386,6 +396,15 @@ const en: Dict = {
   never: "never",
   cameraUnavailable: "Camera unavailable. Paste the code instead.",
   cameraPreview: "Camera preview for QR scanning",
+  saveFailed: "Could not save on this device (storage full or unavailable).",
+  elsewhereTitle: "agora is open in another tab",
+  elsewhereHint:
+    "One tab at a time, so two tabs do not overwrite your groups. Close the other one, or use this one.",
+  useHere: "Use this tab",
+  actionFailed: "Failed",
+  pollNotHere: "This poll has not reached this device (yet).",
+  groupNotFound: "Group not found",
+  groupNotFoundHint: "This group is not on this device. To join it, open its invitation link.",
 };
 
 export type Lang = "fr" | "en";

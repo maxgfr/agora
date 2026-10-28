@@ -29,6 +29,9 @@ export interface RingJob {
 
 export type RingCheck = (job: RingJob) => Promise<boolean>;
 
+/** Longest stretch of checking before the page gets the main thread back. */
+const SLICE_MS = 120;
+
 export const inlineRingCheck: RingCheck = async (j) => ringVerify(j.msg, j.ring, j.sig, j.tag);
 
 const keys = (ring: readonly string[]) => ring.map((k) => fromB64u(k));
@@ -102,24 +105,54 @@ export class Verifier {
     return this.verdicts.get(id);
   }
 
-  /** Checks every event not checked yet; resolves to the ids found valid. */
+  /** Verdicts read back from the store. */
+  preload(entries: Iterable<[string, boolean]>): void {
+    for (const [id, ok] of entries) if (!this.verdicts.has(id)) this.verdicts.set(id, ok);
+  }
+
+  /** Marks our own event valid without checking it: we just signed it. */
+  trust(id: string): void {
+    if (this.verdicts.has(id)) return;
+    this.verdicts.set(id, true);
+    this.onVerdict?.(id, true);
+  }
+
+  /** The ids of `events` known valid right now (without checking anything new). */
+  valid(events: ReadonlyMap<string, AgoraEvent>): Set<string> {
+    const valid = new Set<string>();
+    for (const [id] of events) if (this.verdicts.get(id)) valid.add(id);
+    return valid;
+  }
+
+  /**
+   * Checks every event not checked yet; resolves to the ids found valid. A long backlog is
+   * checked in slices: between two, the page gets the main thread back, and `onBatch` gets
+   * the ids valid so far (so the screen fills in as verification goes, instead of waiting).
+   */
   async run(
     events: ReadonlyMap<string, AgoraEvent>,
-    onProgress?: (done: number, total: number) => void,
+    opts: {
+      onProgress?: (done: number, total: number) => void;
+      onBatch?: (valid: Set<string>) => void;
+    } = {},
   ): Promise<Set<string>> {
     const lookup: Lookup = (id) => events.get(id);
     const todo = [...events].filter(([id]) => !this.verdicts.has(id));
     let done = 0;
+    let slice = performance.now();
     for (const [id, ev] of todo) {
       const p = plan(this.groupId, ev, lookup);
       if (p === "pending") continue;
       const ok = typeof p === "boolean" ? p : await this.ringCheck(p).catch(() => false);
       this.verdicts.set(id, ok);
       this.onVerdict?.(id, ok);
-      onProgress?.(++done, todo.length);
+      opts.onProgress?.(++done, todo.length);
+      if (performance.now() - slice > SLICE_MS) {
+        opts.onBatch?.(this.valid(events));
+        await new Promise((r) => setTimeout(r, 0));
+        slice = performance.now();
+      }
     }
-    const valid = new Set<string>();
-    for (const [id] of events) if (this.verdicts.get(id)) valid.add(id);
-    return valid;
+    return this.valid(events);
   }
 }

@@ -6,6 +6,7 @@ import type { MemberCard } from "../../model/events";
 import type { GroupView, MemberView } from "../../model/group";
 import type { GroupSession } from "../../model/session";
 import { CodeInput } from "../components/Codes";
+import { useAction } from "../components/useAction";
 import { t } from "../i18n";
 import { memberName } from "./Polls";
 
@@ -13,7 +14,7 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
   const { s, view } = props;
   const [card, setCard] = useState<MemberCard | null>(null);
   const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
   return (
     <section class="card stack">
       <h2>{t("vouchSomeone")}</h2>
@@ -46,21 +47,23 @@ function VouchSomeone(props: { s: GroupSession; view: GroupView }): JSX.Element 
             <span class="person-name">{card.name ?? t("unnamed")}</span>
             <span class="fingerprint">{fingerprint(card)}</span>
           </p>
+          {error && (
+            <p class="error" role="alert">
+              {error}
+            </p>
+          )}
           <div class="row">
             <button
               type="button"
               class="btn btn-primary"
               disabled={busy}
               data-testid="confirm-vouch"
-              onClick={async () => {
-                setBusy(true);
-                try {
+              onClick={() => {
+                void run(async () => {
                   await s.vouch(card);
                   setDone(true);
                   setCard(null);
-                } finally {
-                  setBusy(false);
-                }
+                });
               }}
             >
               {t("vouchFor", { name: card.name ?? t("unnamed") })}
@@ -83,7 +86,7 @@ function via(view: GroupView, m: MemberView): string {
 
 export function Members(props: { s: GroupSession; view: GroupView }): JSX.Element {
   const { s, view } = props;
-  const [busy, setBusy] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const motionOpen = (key: string) => view.polls.some((p) => p.poll.exclude === key && !p.closed);
   return (
     <div class="stack">
@@ -92,6 +95,11 @@ export function Members(props: { s: GroupSession; view: GroupView }): JSX.Elemen
         <h2>
           {t("tabMembers")} · {view.members.length}
         </h2>
+        {error && (
+          <p class="error" role="alert">
+            {error}
+          </p>
+        )}
         <ul class="members" data-testid="members">
           {view.members.map((m) => {
             const me = m.key === s.me.card.key;
@@ -108,10 +116,9 @@ export function Members(props: { s: GroupSession; view: GroupView }): JSX.Elemen
                   <button
                     type="button"
                     class="btn btn-small btn-danger-ghost"
-                    disabled={busy === m.key}
-                    onClick={async () => {
-                      setBusy(m.key);
-                      try {
+                    disabled={busy}
+                    onClick={() => {
+                      void run(async () => {
                         const id = await s.createPoll({
                           q: t("motionAbout", { name: m.name ?? t("unnamed") }),
                           options: [t("yes"), t("no")],
@@ -120,9 +127,7 @@ export function Members(props: { s: GroupSession; view: GroupView }): JSX.Elemen
                           exclude: m.key,
                         });
                         go({ name: "group", id: s.record.id, tab: "polls", item: id });
-                      } finally {
-                        setBusy(null);
-                      }
+                      });
                     }}
                   >
                     {t("proposeExclusion")}

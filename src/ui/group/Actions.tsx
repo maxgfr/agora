@@ -2,6 +2,7 @@ import type { JSX } from "preact";
 import { useState } from "preact/hooks";
 import type { ActionView, GroupView } from "../../model/group";
 import type { GroupSession } from "../../model/session";
+import { useAction } from "../components/useAction";
 import { t, when } from "../i18n";
 import { CloseSelect } from "./Polls";
 
@@ -10,15 +11,14 @@ function NewAction(props: { s: GroupSession; view: GroupView; onDone: () => void
   const [details, setDetails] = useState("");
   const [threshold, setThreshold] = useState(Math.max(1, Math.ceil(props.view.members.length / 2)));
   const [hours, setHours] = useState(168);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
   const max = props.view.members.length;
   return (
     <form
       class="card stack"
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
-        setBusy(true);
-        try {
+        void run(async () => {
           await props.s.createAction({
             title: title.trim(),
             details: details.trim(),
@@ -26,9 +26,7 @@ function NewAction(props: { s: GroupSession; view: GroupView; onDone: () => void
             closes: Date.now() + hours * 3_600_000,
           });
           props.onDone();
-        } finally {
-          setBusy(false);
-        }
+        });
       }}
     >
       <h2>{t("newAction")}</h2>
@@ -67,6 +65,11 @@ function NewAction(props: { s: GroupSession; view: GroupView; onDone: () => void
         <span>{t("thresholdUnit")}</span>
       </label>
       <CloseSelect hours={hours} onChange={setHours} />
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
       <div class="row">
         <button type="submit" class="btn btn-primary" disabled={busy || !title.trim()}>
           {t("publish")}
@@ -81,7 +84,7 @@ function NewAction(props: { s: GroupSession; view: GroupView; onDone: () => void
 
 function ActionCard(props: { s: GroupSession; av: ActionView }): JSX.Element {
   const { s, av } = props;
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
   const a = av.action;
   const inRing = a.ring.includes(s.me.card.key);
   const on = av.mine?.on ?? false;
@@ -104,18 +107,21 @@ function ActionCard(props: { s: GroupSession; av: ActionView }): JSX.Element {
         <span>{av.closed ? t("closed") : t("closesAt", { t: when(a.closes) })}</span>
       </p>
       {on && <p class="ok-line">{t("youPledged")}</p>}
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+
       {inRing && !av.closed && (
         <button
           type="button"
           class={on ? "btn" : "btn btn-primary"}
           disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
+          onClick={() => {
+            void run(async () => {
               await s.pledge(av.id, !on);
-            } finally {
-              setBusy(false);
-            }
+            });
           }}
         >
           {on ? t("unpledge") : t("pledge")}
