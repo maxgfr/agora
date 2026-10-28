@@ -1,5 +1,6 @@
 import type { JSX } from "preact";
-import { go, phase, route } from "../app/state";
+import { phase, route, saveError, takeOver } from "../app/state";
+import { Link } from "./components/Link";
 import { Logo } from "./components/Logo";
 import { lang, setLang, t } from "./i18n";
 import { applyUpdate, updateReady } from "./pwa";
@@ -16,9 +17,18 @@ function Screen(): JSX.Element {
     case "create":
       return <CreateGroup />;
     case "join":
-      return <Join {...(r.invite ? { invite: r.invite } : {})} />;
+      return (
+        <Join key={r.invite ? "invite" : "paste"} {...(r.invite ? { invite: r.invite } : {})} />
+      );
     case "group":
-      return <GroupScreen id={r.id} tab={r.tab ?? "polls"} {...(r.item ? { item: r.item } : {})} />;
+      return (
+        <GroupScreen
+          key={r.id}
+          id={r.id}
+          tab={r.tab ?? "polls"}
+          {...(r.item ? { item: r.item } : {})}
+        />
+      );
     case "settings":
       return <SettingsScreen />;
     default:
@@ -31,10 +41,10 @@ export function App(): JSX.Element {
   return (
     <div class="app">
       <header class="topbar">
-        <button type="button" class="brand" onClick={() => go({ name: "home" })}>
+        <Link to={{ name: "home" }} class="brand">
           <Logo />
           <span class="wordmark">agora</span>
-        </button>
+        </Link>
         <div class="row">
           <button
             type="button"
@@ -45,16 +55,17 @@ export function App(): JSX.Element {
             {lang.value === "fr" ? "EN" : "FR"}
           </button>
           {p === "ready" && (
-            <button
-              type="button"
-              class="btn btn-small btn-ghost"
-              onClick={() => go({ name: "settings" })}
-            >
+            <Link to={{ name: "settings" }} class="btn btn-small btn-ghost">
               {t("settings")}
-            </button>
+            </Link>
           )}
         </div>
       </header>
+      {saveError.value && (
+        <div class="banner banner-error" role="alert">
+          <span>{t("saveFailed")}</span>
+        </div>
+      )}
       {updateReady.value && (
         <div class="banner" role="status">
           <span>{t("updateReady")}</span>
@@ -67,6 +78,15 @@ export function App(): JSX.Element {
         {p === "loading" && <div class="spinner" aria-hidden="true" />}
         {p === "error" && <p class="error">{t("bootError")}</p>}
         {p === "locked" && <Locked />}
+        {p === "elsewhere" && (
+          <div class="stack narrow">
+            <h1>{t("elsewhereTitle")}</h1>
+            <p class="lead">{t("elsewhereHint")}</p>
+            <button type="button" class="btn btn-primary" onClick={takeOver}>
+              {t("useHere")}
+            </button>
+          </div>
+        )}
         {p === "ready" && <Screen />}
       </main>
       <footer class="footer">

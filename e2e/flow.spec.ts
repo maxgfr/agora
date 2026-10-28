@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { close, open, type Person, person, tab, text } from "./helpers";
+import { close, found, open, type Person, person, tab, text } from "./helpers";
 
 /** Waits until a person is a member (the group tabs show). */
 async function admitted(p: Person): Promise<void> {
-  await expect(p.page.getByRole("button", { name: "Polls", exact: true })).toBeVisible({
+  await expect(p.page.getByRole("navigation").getByRole("link", { name: "Polls" })).toBeVisible({
     timeout: 30_000,
   });
 }
@@ -30,15 +30,7 @@ test("a group: vouching, a blind ticket, a poll, a changed vote and an action", 
 
   // Ada founds the group: vouching (1) and organizer tickets.
   await open(ada);
-  await ada.page.getByRole("button", { name: "Create a group" }).click();
-  await ada.page.getByLabel("Group name").fill("Building 12");
-  await ada.page.getByLabel("Your pseudonym in the group").fill("ada");
-  await ada.page.getByLabel("Vouches needed").fill("1");
-  await ada.page.getByTestId("ticket-mode").check();
-  await ada.page.getByRole("button", { name: "Create the group" }).click();
-  await expect(ada.page.getByTestId("group-name")).toHaveText("Building 12");
-  const link = await text(ada, "invite-link");
-  const fragment = link.slice(link.indexOf("#"));
+  const fragment = await found(ada, "Building 12", { tickets: true });
 
   // Bob opens the link and shows his card; Ada vouches for him.
   await open(bob, fragment);
@@ -124,14 +116,10 @@ test("a group: vouching, a blind ticket, a poll, a changed vote and an action", 
 test("a reload keeps the group", async ({ browser }) => {
   const ada = await person(browser, "ada");
   await open(ada);
-  await ada.page.getByRole("button", { name: "Create a group" }).click();
-  await ada.page.getByLabel("Group name").fill("Secret club");
-  await ada.page.getByLabel("Your pseudonym in the group").fill("ada");
-  await ada.page.getByRole("button", { name: "Create the group" }).click();
-  await expect(ada.page.getByTestId("group-name")).toHaveText("Secret club");
+  await found(ada, "Secret club");
   await open(ada);
   await expect(ada.page.getByTestId("groups")).toContainText("Secret club");
   await ada.page.getByTestId("groups").getByText("Secret club").click();
-  await expect(ada.page.getByRole("button", { name: "Polls", exact: true })).toBeVisible();
+  await admitted(ada);
   await close(ada);
 });

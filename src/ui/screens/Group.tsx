@@ -1,6 +1,7 @@
 import type { JSX } from "preact";
 import { type GroupTab, go, leaveGroup, session, sessionsVersion } from "../../app/state";
 import type { GroupSession } from "../../model/session";
+import { Link } from "../components/Link";
 import { Actions } from "../group/Actions";
 import { Admission } from "../group/Admission";
 import { Invite } from "../group/Invite";
@@ -35,10 +36,12 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
   const s = session(props.id);
   if (!s) {
     return (
-      <div class="stack">
-        <button type="button" class="btn btn-ghost" onClick={() => go({ name: "home" })}>
-          ← {t("back")}
-        </button>
+      <div class="stack narrow">
+        <h1>{t("groupNotFound")}</h1>
+        <p class="lead">{t("groupNotFoundHint")}</p>
+        <Link to={{ name: "home" }} class="btn btn-primary">
+          {t("yourGroups")}
+        </Link>
       </div>
     );
   }
@@ -48,13 +51,9 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
   return (
     <div class="stack group">
       <div class="group-head stack-tight">
-        <button
-          type="button"
-          class="btn btn-ghost btn-small back"
-          onClick={() => go({ name: "home" })}
-        >
+        <Link to={{ name: "home" }} class="btn btn-ghost btn-small back">
           ← {t("back")}
-        </button>
+        </Link>
         <h1 data-testid="group-name">{genesis?.name ?? "…"}</h1>
         {genesis?.about && <p class="lead">{genesis.about}</p>}
         <Status s={s} />
@@ -70,20 +69,19 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
         <>
           <nav class="tabs" aria-label={genesis.name}>
             {TABS.map(([id, label]) => (
-              <button
+              <Link
                 key={id}
-                type="button"
+                to={{ name: "group", id: props.id, tab: id }}
                 class={`tab ${tab === id ? "tab-on" : ""}`}
-                aria-current={tab === id ? "page" : undefined}
-                onClick={() => go({ name: "group", id: props.id, tab: id })}
+                current={tab === id && !(id === "polls" && props.item)}
               >
                 {t(label)}
-              </button>
+              </Link>
             ))}
           </nav>
           {tab === "polls" &&
             (props.item ? (
-              <PollDetail s={s} view={view} id={props.item} />
+              <PollDetail key={props.item} s={s} view={view} id={props.item} />
             ) : (
               <Polls s={s} view={view} />
             ))}
@@ -99,7 +97,7 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
           onClick={async () => {
             if (!confirm(t("leaveConfirm"))) return;
             await leaveGroup(props.id);
-            go({ name: "home" });
+            go({ name: "home" }, { replace: true });
           }}
         >
           {t("leave")}

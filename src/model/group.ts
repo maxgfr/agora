@@ -110,7 +110,18 @@ export function fold(
   valid: ReadonlySet<string>,
   me: Me | undefined,
   now = Date.now(),
+  /** Our key images by tag, kept across folds (each costs a hash to the curve and a product). */
+  images: Map<string, string> = new Map(),
 ): GroupView {
+  const myImage = (kind: string, id: string, tag: Uint8Array): string => {
+    const k = `${kind}:${id}`;
+    let img = images.get(k);
+    if (img === undefined && me) {
+      img = toHex(keyImage(me.sign.secret, tag));
+      images.set(k, img);
+    }
+    return img ?? "";
+  };
   const linkKid = keyId(g.linkKey);
   const view: GroupView = {
     genesisId,
@@ -244,7 +255,7 @@ export function fold(
     const { counts, voters, latest } = tallyPoll(id, poll);
     const pv: PollView = { id, poll, counts, voters, closed: now >= poll.closes, rosterSize };
     if (me && poll.ring.includes(me.card.key)) {
-      const mine = latest.get(toHex(keyImage(me.sign.secret, voteTag(g.groupId, id))));
+      const mine = latest.get(myImage("vote", id, voteTag(g.groupId, id)));
       if (mine) pv.mine = { choice: mine.choice, seq: mine.seq };
     }
     if (poll.exclude && pv.closed) pv.passed = (counts[0] ?? 0) * 2 > poll.ring.length;
@@ -265,7 +276,7 @@ export function fold(
       rosterSize,
     };
     if (me && action.ring.includes(me.card.key)) {
-      const mine = latest.get(toHex(keyImage(me.sign.secret, pledgeTag(g.groupId, id))));
+      const mine = latest.get(myImage("pledge", id, pledgeTag(g.groupId, id)));
       if (mine) av.mine = { on: mine.on, seq: mine.seq };
     }
     view.actions.push(av);

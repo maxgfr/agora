@@ -98,6 +98,7 @@ export class GroupSession {
   private readonly events = new Map<string, AgoraEvent>();
   private readonly sealed = new Set<string>();
   private readonly verifier: Verifier;
+  private readonly images = new Map<string, string>();
   private nostr: NostrTransport | null = null;
   private swarm: Swarm | null = null;
   private recomputing = false;
@@ -105,6 +106,7 @@ export class GroupSession {
   private maintenance: ReturnType<typeof setTimeout> | undefined;
   private admitTimer: ReturnType<typeof setTimeout> | undefined;
   private syncTimer: ReturnType<typeof setTimeout> | undefined;
+  private deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
   private admitting = false;
 
@@ -123,11 +125,12 @@ export class GroupSession {
     this.view.value = fold(this.g, record.genesisId, this.events, new Set(), this.me);
   }
 
-  /** Loads what the store holds, then goes online. */
+  /** Loads what the store holds, goes online, then checks and folds. */
   async start(): Promise<void> {
+    this.verifier.preload(await this.store.verdicts(this.record.id));
     for (const wire of await this.store.wires(this.record.id)) await this.ingest(wire, false);
+    if (!this.net.offline && !this.closed) this.connect();
     await this.recompute();
-    if (!this.net.offline) this.connect();
     this.scheduleAdmit();
   }
 
@@ -184,6 +187,7 @@ export class GroupSession {
     clearTimeout(this.maintenance);
     clearTimeout(this.admitTimer);
     clearTimeout(this.syncTimer);
+    clearTimeout(this.deadlineTimer);
     this.nostr?.close();
     this.swarm?.close();
   }
@@ -256,14 +260,14 @@ export class GroupSession {
       do {
         this.again = false;
         const keysBefore = this.view.value?.keys.size ?? 0;
-        const valid = await this.verifier.run(this.events, (done, total) => {
-          this.verifying.value = done < total ? { done, total } : null;
+        const valid = await this.verifier.run(this.events, {
+          onProgress: (done, total) => {
+            this.verifying.value = done < total ? { done, total } : null;
+          },
+          onBatch: (v) => this.show(v),
         });
         this.verifying.value = null;
-        const view = fold(this.g, this.record.genesisId, this.events, valid, this.me);
-        this.view.value = view;
-        if (view.genesis && view.genesis.name !== this.record.name)
-          this.updateRecord({ name: view.genesis.name });
+        const view = this.show(valid);
         // New keys: what was unreadable may open now.
         if (view.keys.size > keysBefore) {
           for (const wire of this.wires.values())
@@ -275,6 +279,43 @@ export class GroupSession {
       this.recomputing = false;
     }
     this.planMaintenance();
+  }
+
+  /** Folds what is known valid now and shows it. */
+  private show(valid: ReadonlySet<string>): GroupView {
+    const view = fold(
+      this.g,
+      this.record.genesisId,
+      this.events,
+      valid,
+      this.me,
+      Date.now(),
+      this.images,
+    );
+    this.view.value = view;
+    if (view.genesis && view.genesis.name !== this.record.name)
+      this.updateRecord({ name: view.genesis.name });
+    this.planDeadline(view);
+    return view;
+  }
+
+  /** Folds again when the next poll or action closes (results, motions take effect then). */
+  private planDeadline(view: GroupView): void {
+    clearTimeout(this.deadlineTimer);
+    const now = Date.now();
+    let next = Number.POSITIVE_INFINITY;
+    for (const p of view.polls) if (p.poll.closes > now) next = Math.min(next, p.poll.closes);
+    for (const a of view.actions) if (a.action.closes > now) next = Math.min(next, a.action.closes);
+    if (!Number.isFinite(next) || this.closed) return;
+    // setTimeout holds at most ~24.8 days; a later deadline is planned again on the way.
+    this.deadlineTimer = setTimeout(
+      () => {
+        if (this.recomputing) return;
+        this.show(this.verifier.valid(this.events));
+        this.planMaintenance();
+      },
+      Math.min(next - now + 50, 2 ** 31 - 1),
+    );
   }
 
   private collectVouches(valid: ReadonlySet<string>): void {
@@ -320,12 +361,17 @@ export class GroupSession {
     const key = CONTROL.has(ev.t) || !view ? this.g.linkKey : view.writeKey;
     const wire = toB64u(seal(key, this.g.groupId, utf8(JSON.stringify(ev))));
     const id = await wireId(wire);
+    const evId = eventId(ev);
+    // Ours: no need to spend a ring check on it, and it shows at once.
+    this.verifier.trust(evId);
     await this.store.addWire(this.record.id, id, wire);
     await this.ingest(wire, false);
     this.nostr?.send(this.g.topic, wire);
     this.swarm?.broadcast(wire);
-    await this.recompute();
-    return eventId(ev);
+    // A backlog may be under verification: show our event now rather than after it.
+    if (this.recomputing) this.show(this.verifier.valid(this.events));
+    else await this.recompute();
+    return evId;
   }
 
   private requireMember() {

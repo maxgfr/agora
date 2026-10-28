@@ -29,10 +29,14 @@ export async function person(browser: Browser, name: string): Promise<Person> {
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
   await ctx.addInitScript(
     ({ s }) => {
-      if (sessionStorage.getItem("agora.test.seeded")) return;
-      localStorage.setItem("agora.settings.v1", s);
-      localStorage.setItem("agora.lang", "en");
-      sessionStorage.setItem("agora.test.seeded", "1");
+      try {
+        if (sessionStorage.getItem("agora.test.seeded")) return;
+        localStorage.setItem("agora.settings.v1", s);
+        localStorage.setItem("agora.lang", "en");
+        sessionStorage.setItem("agora.test.seeded", "1");
+      } catch {
+        // about:blank (going back past the app's first page) has no storage
+      }
     },
     { s: settingsJson() },
   );
@@ -58,7 +62,24 @@ export async function text(p: Person, testId: string): Promise<string> {
 }
 
 export async function tab(p: Person, name: "Polls" | "Actions" | "Members" | "Invite") {
-  await p.page.getByRole("button", { name, exact: true }).click();
+  await p.page.getByRole("navigation").getByRole("link", { name, exact: true }).click();
+}
+
+/** Founds a group from the home screen; returns its invitation fragment (`#g=…`). */
+export async function found(
+  p: Person,
+  name: string,
+  opts: { vouches?: number; tickets?: boolean } = {},
+): Promise<string> {
+  await p.page.getByRole("link", { name: "Create a group" }).click();
+  await p.page.getByLabel("Group name").fill(name);
+  await p.page.getByLabel("Your pseudonym in the group").fill(p.name);
+  await p.page.getByLabel("Vouches needed").fill(String(opts.vouches ?? 1));
+  if (opts.tickets) await p.page.getByTestId("ticket-mode").check();
+  await p.page.getByRole("button", { name: "Create the group" }).click();
+  await expect(p.page.getByTestId("group-name")).toHaveText(name);
+  const link = await text(p, "invite-link");
+  return link.slice(link.indexOf("#"));
 }
 
 export async function close(...people: Person[]): Promise<void> {

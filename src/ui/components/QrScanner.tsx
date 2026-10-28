@@ -45,26 +45,40 @@ export function QrScanner(props: {
       const scan = async () => {
         const v = video.current;
         if (stopped || !v) return;
+        const started = performance.now();
         let text: string | null = null;
         if (v.videoWidth > 0) {
           if (detector) {
             text = (await detector.detect(v).catch(() => []))[0]?.rawValue ?? null;
           } else if (jsQR && ctx) {
-            const w = Math.min(640, v.videoWidth);
-            const h = Math.round((v.videoHeight / v.videoWidth) * w);
-            canvas.width = w;
-            canvas.height = h;
-            ctx.drawImage(v, 0, 0, w, h);
+            // jsQR runs on the main thread: only the square under the reticle, at most 400 px.
+            const side = Math.min(v.videoWidth, v.videoHeight);
+            const size = Math.min(400, side);
+            canvas.width = size;
+            canvas.height = size;
+            ctx.drawImage(
+              v,
+              (v.videoWidth - side) / 2,
+              (v.videoHeight - side) / 2,
+              side,
+              side,
+              0,
+              0,
+              size,
+              size,
+            );
             text =
-              jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" })
-                ?.data ?? null;
+              jsQR(ctx.getImageData(0, 0, size, size).data, size, size, {
+                inversionAttempts: "dontInvert",
+              })?.data ?? null;
           }
         }
         if (text && !stopped) {
           props.onResult(text);
           return;
         }
-        timer = setTimeout(scan, 120);
+        // Idle at least twice as long as a scan took: a slow phone stays responsive.
+        timer = setTimeout(scan, Math.max(150, 2 * (performance.now() - started)));
       };
       void scan();
     })();

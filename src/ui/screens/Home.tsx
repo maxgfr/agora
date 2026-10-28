@@ -1,5 +1,6 @@
 import type { JSX } from "preact";
-import { go, groups, session, sessionsVersion } from "../../app/state";
+import { groups, session, sessionsVersion } from "../../app/state";
+import { Link } from "../components/Link";
 import { membersLabel, t } from "../i18n";
 
 export function Home(): JSX.Element {
@@ -11,16 +12,12 @@ export function Home(): JSX.Element {
         <h1>{t("tagline")}</h1>
         <p class="lead">{t("intro")}</p>
         <div class="row">
-          <button
-            type="button"
-            class="btn btn-primary btn-large"
-            onClick={() => go({ name: "create" })}
-          >
+          <Link to={{ name: "create" }} class="btn btn-primary btn-large">
             {t("createGroup")}
-          </button>
-          <button type="button" class="btn btn-large" onClick={() => go({ name: "join" })}>
+          </Link>
+          <Link to={{ name: "join" }} class="btn btn-large">
             {t("joinGroup")}
-          </button>
+          </Link>
         </div>
       </section>
       <section class="stack">
@@ -32,7 +29,7 @@ export function Home(): JSX.Element {
             const isMember = !!view?.me;
             return (
               <li key={g.id}>
-                <button type="button" class="tile" onClick={() => go({ name: "group", id: g.id })}>
+                <Link to={{ name: "group", id: g.id }} class="tile">
                   <span class="tile-title">{g.name || view?.genesis?.name || "…"}</span>
                   <span class="tile-meta">
                     {view?.genesis ? membersLabel(view.members.length) : t("loadingGroup")}
@@ -45,7 +42,7 @@ export function Home(): JSX.Element {
                       </span>
                     )}
                   </span>
-                </button>
+                </Link>
               </li>
             );
           })}

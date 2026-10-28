@@ -1,9 +1,10 @@
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
-import { go } from "../../app/state";
 import { MAX_OPTIONS } from "../../model/events";
 import type { GroupView, PollView } from "../../model/group";
 import type { GroupSession } from "../../model/session";
+import { Link } from "../components/Link";
+import { useAction } from "../components/useAction";
 import { CLOSE_HOURS, duration, t, when } from "../i18n";
 
 export function memberName(view: GroupView, key: string): string {
@@ -31,15 +32,14 @@ function NewPoll(props: { s: GroupSession; onDone: () => void }): JSX.Element {
   const [options, setOptions] = useState(["", ""]);
   const [multi, setMulti] = useState(false);
   const [hours, setHours] = useState(72);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
   const valid = q.trim() && options.filter((o) => o.trim()).length >= 2;
   return (
     <form
       class="card stack"
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
-        setBusy(true);
-        try {
+        void run(async () => {
           await props.s.createPoll({
             q: q.trim(),
             options: options.map((o) => o.trim()).filter(Boolean),
@@ -47,9 +47,7 @@ function NewPoll(props: { s: GroupSession; onDone: () => void }): JSX.Element {
             closes: Date.now() + hours * 3_600_000,
           });
           props.onDone();
-        } finally {
-          setBusy(false);
-        }
+        });
       }}
     >
       <h2>{t("newPoll")}</h2>
@@ -99,6 +97,11 @@ function NewPoll(props: { s: GroupSession; onDone: () => void }): JSX.Element {
         <span>{t("multi")}</span>
       </label>
       <CloseSelect hours={hours} onChange={setHours} />
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
       <div class="row">
         <button type="submit" class="btn btn-primary" disabled={busy || !valid}>
           {t("publish")}
@@ -133,11 +136,7 @@ export function Polls(props: { s: GroupSession; view: GroupView }): JSX.Element 
       <ul class="tiles" data-testid="polls">
         {view.polls.map((pv) => (
           <li key={pv.id}>
-            <button
-              type="button"
-              class="tile"
-              onClick={() => go({ name: "group", id: s.record.id, tab: "polls", item: pv.id })}
-            >
+            <Link to={{ name: "group", id: s.record.id, tab: "polls", item: pv.id }} class="tile">
               <span class="tile-title">
                 {pv.poll.exclude && <span class="badge badge-warn">{t("motion")}</span>}{" "}
                 {pollTitle(view, pv)}
@@ -148,7 +147,7 @@ export function Polls(props: { s: GroupSession; view: GroupView }): JSX.Element 
                 <span>{pv.closed ? t("closed") : t("closesAt", { t: when(pv.poll.closes) })}</span>
                 {pv.mine && <span class="badge badge-ok">✓</span>}
               </span>
-            </button>
+            </Link>
           </li>
         ))}
       </ul>
@@ -191,8 +190,20 @@ export function PollDetail(props: { s: GroupSession; view: GroupView; id: string
   const pv = view.polls.find((p) => p.id === props.id);
   const [choice, setChoice] = useState<number[]>([]);
   const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  if (!pv) return <p class="hint">…</p>;
+  const { busy, error, run } = useAction();
+  if (!pv) {
+    return (
+      <section class="stack">
+        <Link
+          to={{ name: "group", id: s.record.id, tab: "polls" }}
+          class="btn btn-ghost btn-small back"
+        >
+          ← {t("tabPolls")}
+        </Link>
+        <p class="hint">{t("pollNotHere")}</p>
+      </section>
+    );
+  }
   const inRing = pv.poll.ring.includes(s.me.card.key);
   const canVote = inRing && !pv.closed && (!pv.mine || editing);
   const toggle = (i: number) => {
@@ -201,13 +212,12 @@ export function PollDetail(props: { s: GroupSession; view: GroupView; id: string
   };
   return (
     <section class="stack">
-      <button
-        type="button"
+      <Link
+        to={{ name: "group", id: s.record.id, tab: "polls" }}
         class="btn btn-ghost btn-small back"
-        onClick={() => go({ name: "group", id: s.record.id, tab: "polls" })}
       >
         ← {t("tabPolls")}
-      </button>
+      </Link>
       <article class="card stack">
         {pv.poll.exclude && <span class="badge badge-warn">{t("motion")}</span>}
         <h2 data-testid="poll-title">{pollTitle(view, pv)}</h2>
@@ -225,16 +235,13 @@ export function PollDetail(props: { s: GroupSession; view: GroupView; id: string
         {canVote ? (
           <form
             class="stack"
-            onSubmit={async (e) => {
+            onSubmit={(e) => {
               e.preventDefault();
-              setBusy(true);
-              try {
+              void run(async () => {
                 await s.vote(pv.id, choice);
                 setEditing(false);
                 setChoice([]);
-              } finally {
-                setBusy(false);
-              }
+              });
             }}
           >
             <fieldset class="choices">
@@ -283,6 +290,11 @@ export function PollDetail(props: { s: GroupSession; view: GroupView; id: string
             )}
             {!inRing && <p class="hint">{t("notInRing")}</p>}
           </>
+        )}
+        {error && (
+          <p class="error" role="alert">
+            {error}
+          </p>
         )}
         <Results pv={pv} />
         <p class="hint small">{t("ringNote", { n: pv.poll.ring.length })}</p>

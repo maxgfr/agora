@@ -34,6 +34,8 @@
 - **Results depend on what a device received.** Two devices with the same events agree; a relay
   can withhold events (peer-to-peer sync and several relays make this harder).
 - **Group size.** Rings are capped at 256 members; a vote is then about 8 KiB.
+- **Browser history** holds the screens visited (`#/g/<group id>/polls/<poll id>`): ids, never
+  the group secret, which leaves the address bar as soon as an invitation is opened.
 - **Device compromise.** Malware on a device, or someone with an unlocked device, can vote as
   its owner.
 - **No post-quantum security.** The ring signatures and blind tickets rely on discrete logarithms
