@@ -9,9 +9,11 @@
 import { signal } from "@preact/signals";
 import { newVaultKey, openVault, sealVault, type VaultKey } from "../crypto/vault";
 import { fromUtf8, utf8 } from "../lib/bytes";
-import { type Invitation, parseInvite } from "../model/codes";
+import { classifyCode, type Invitation, parseInvite } from "../model/codes";
+import type { MemberCard } from "../model/events";
 import { foundGroup, type GroupRecord, GroupSession, joinRecord } from "../model/session";
 import { IdbStore, MemoryStore, type Store } from "../model/store";
+import type { Key } from "../ui/i18n";
 import { ringChecker } from "./ring-worker";
 import { type GroupTab, hashToRoute, type Route, routeToHash } from "./router";
 import { iceServers, settings, signalConfig } from "./settings";
@@ -42,6 +44,16 @@ let ringCheck: ReturnType<typeof ringChecker> | null = null;
 /** An invitation read from the address bar, waiting on the join screen. */
 let pendingInvite: Invitation | null = null;
 
+/** What the app's scanner read, for the screen it opened to pick up. */
+export type ScanIntent =
+  | { groupId: string; kind: "card"; card: MemberCard }
+  | { groupId: string; kind: "request"; text: string }
+  | { groupId: string; kind: "answer"; text: string }
+  | { groupId: string; kind: "organizer"; text: string };
+
+export const scanIntent = signal<ScanIntent | null>(null);
+export const scanOpen = signal(false);
+
 // ---------------------------------------------------------------------------
 // Navigation
 
@@ -71,14 +83,7 @@ function fromLocation(): void {
   if (invite) {
     // The secret leaves the address bar (and the history) at once.
     history.replaceState(null, "", "#/join");
-    const existing = groups.value.find((g) => g.genesisId === invite.genesisId);
-    if (existing) {
-      go({ name: "group", id: existing.id }, { replace: true });
-    } else {
-      pendingInvite = invite;
-      route.value = { name: "join", invite };
-      document.title = "agora";
-    }
+    openInvite(invite, true);
     return;
   }
   const r = hashToRoute(location.hash);
@@ -93,6 +98,69 @@ function fromLocation(): void {
 
 export function session(id: string): GroupSession | undefined {
   return sessions.get(id);
+}
+
+/** Opens an invitation: its group if already joined, else the join screen. */
+function openInvite(invite: Invitation, replace: boolean): void {
+  const existing = groups.value.find((g) => g.genesisId === invite.genesisId);
+  if (existing) {
+    go({ name: "group", id: existing.id }, { replace });
+    return;
+  }
+  pendingInvite = invite;
+  route.value = { name: "join", invite };
+  document.title = "agora";
+  if (location.hash !== "#/join") {
+    if (replace) history.replaceState(null, "", "#/join");
+    else history.pushState(null, "", "#/join");
+  }
+}
+
+/**
+ * Takes any agora code from the scanner and opens what it is for: an invitation joins, a card
+ * goes to vouching, a ticket request to the organizer's desk, an answer to one's admission.
+ * Returns an error message key, or null when it was handled.
+ */
+export function handleScan(text: string): Key | null {
+  const code = classifyCode(text);
+  if (!code) return "codeUnknown";
+  if (code.kind === "invite") {
+    openInvite(code.invite, false);
+    return null;
+  }
+  const groupId = code.code.groupId;
+  const fits = (rec: GroupRecord): boolean => {
+    const view = sessions.get(rec.id)?.view.value;
+    if (code.kind === "card") return !!view?.me && (view.policy?.vouches ?? 0) > 0;
+    if (code.kind === "request") return !!rec.organizer?.length;
+    if (code.kind === "answer") return !!rec.ticket;
+    return (view?.policy?.issuers.length ?? 0) > 0;
+  };
+  let rec: GroupRecord | undefined;
+  if (groupId) {
+    rec = groups.value.find((g) => g.id === groupId);
+    if (!rec) return "codeOtherGroup";
+    if (!fits(rec))
+      return code.kind === "card"
+        ? "notMemberThere"
+        : code.kind === "request"
+          ? "notOrganizerThere"
+          : code.kind === "answer"
+            ? "noTicketPending"
+            : "invalidOrganizer";
+  } else {
+    // A version 1 code names no group: only unambiguous if one group fits.
+    const candidates = groups.value.filter(fits);
+    if (candidates.length !== 1) return "openGroupFirst";
+    rec = candidates[0] as GroupRecord;
+  }
+  scanIntent.value =
+    code.kind === "card"
+      ? { groupId: rec.id, kind: "card", card: code.code.value }
+      : ({ groupId: rec.id, kind: code.kind, text } as ScanIntent);
+  const tab = code.kind === "card" ? "members" : code.kind === "answer" ? undefined : "invite";
+  go(tab ? { name: "group", id: rec.id, tab } : { name: "group", id: rec.id });
+  return null;
 }
 
 // ---------------------------------------------------------------------------

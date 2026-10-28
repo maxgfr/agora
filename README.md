@@ -23,8 +23,10 @@ or the organizer sees who voted what. agora keeps both properties at once:
   to a server. Anyone with the link can read the group and ask to join; only admitted members
   can vote.
 - **Two ways in**, chosen when the group is created (one or both):
-  - **Vouching**: a newcomer shows a QR code; `k` members scan it and vouch (or compare five
-    emojis over a call). Their device admits itself once it has enough vouches.
+  - **Vouching**: a newcomer types the pseudonym of a member who knows them (no list of members
+    is ever shown) and their request, boxed to that member alone, shows up on the member's
+    device as a pending request; or they show a QR code that members scan. Either way the two
+    compare five emojis, and the newcomer's device admits itself once it has `k` vouches.
   - **Organizer tickets**: the organizer checks the person (ID at the door, a membership list…),
     then signs their ticket request *blind* (BLS on BLS12-381). The organizer knows who got a
     ticket, but cannot link it to the member key it admits; the admission is published after a
@@ -38,6 +40,8 @@ or the organizer sees who voted what. agora keeps both properties at once:
 - **Sync without a server**: sealed events are stored on public **Nostr relays** (they only see an
   opaque tag and ciphertext), and devices online at the same time also sync **peer to peer over
   WebRTC**, so a vote still spreads if every relay drops it.
+- **One scan button** in the header reads any agora code (an invitation, a newcomer's card, a
+  ticket request or answer, an organizer key) and opens the screen it is for.
 - **Installable PWA**, works offline once loaded, English and French, optional **passphrase lock**
   of the device's keys (Argon2id), strict CSP, Trusted Types, no telemetry.
 

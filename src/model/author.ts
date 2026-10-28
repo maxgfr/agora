@@ -7,7 +7,7 @@
 import { blindRequest } from "../crypto/blind";
 import { type KeyPair, keyPairFromSeed, ringSign, schnorrSign } from "../crypto/ristretto";
 import { boxKeyPair, boxSeal, type GroupKeys, keyId } from "../crypto/seal";
-import { type Bytes, fromB64u, randomBytes, toB64u } from "../lib/bytes";
+import { type Bytes, fromB64u, randomBytes, toB64u, utf8 } from "../lib/bytes";
 import {
   type Action,
   type Admit,
@@ -21,6 +21,8 @@ import {
   type Policy,
   type Poll,
   pledgeTag,
+  type RequestEvent,
+  requestContext,
   signedMessage,
   type Vote,
   type Vouch,
@@ -73,6 +75,23 @@ export function vouchFor(g: GroupKeys, voucher: Me, card: MemberCard): Vouch {
     by: voucher.card.key,
     sig: toB64u(schnorrSign(DOMAIN.vouch, voucher.sign.secret, vouchMessage(g.groupId, card))),
   };
+}
+
+/** Asks the member whose card is `to` to vouch for us (only they can open it). */
+export function createRequest(
+  g: GroupKeys,
+  me: Me,
+  to: MemberCard,
+  now = Date.now(),
+): RequestEvent {
+  const box = boxSeal(
+    fromB64u(to.box),
+    utf8(JSON.stringify({ card: me.card })),
+    requestContext(g.groupId),
+  );
+  const ev: RequestEvent = { t: "request", ts: now, to: to.box, box: toB64u(box), sig: "" };
+  ev.sig = toB64u(schnorrSign(DOMAIN.pop, me.sign.secret, signedMessage(g.groupId, ev)));
+  return ev;
 }
 
 /** The same vouch, published to the group for the newcomer's device to collect. */

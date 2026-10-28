@@ -3,6 +3,7 @@
  * object; binary fields are base64url. See PROTOCOL.md for the full spec.
  *
  *  genesis  the founder creates the group: its name and admission policy
+ *  request  a newcomer asks one member (named by them) to vouch, boxed to that member
  *  vouch    a member vouches for a newcomer's card (scanned in person or pasted)
  *  admit    a newcomer's keys, with k vouches from members or a blind ticket
  *  poll     a question, signed anonymously by a member over a frozen ring
@@ -52,6 +53,21 @@ export interface Genesis {
 
 export interface Vouch {
   by: string;
+  sig: string;
+}
+
+/**
+ * A newcomer asks a member to vouch for them. The card is boxed to that member's X25519 key:
+ * other holders of the invitation see neither who asks nor whom. `sig` is the newcomer's
+ * Schnorr signature (pop domain), checked by the recipient once the box is open.
+ */
+export interface RequestEvent {
+  t: "request";
+  ts: number;
+  /** The recipient's X25519 public key. */
+  to: string;
+  /** boxSeal(to, JSON of {card}) under `requestContext`. */
+  box: string;
   sig: string;
 }
 
@@ -134,11 +150,26 @@ export interface KeyEvent {
   sig: string;
 }
 
-export type AgoraEvent = Genesis | VouchEvent | Admit | Poll | Vote | Action | Pledge | KeyEvent;
+export type AgoraEvent =
+  | Genesis
+  | RequestEvent
+  | VouchEvent
+  | Admit
+  | Poll
+  | Vote
+  | Action
+  | Pledge
+  | KeyEvent;
 export type EventType = AgoraEvent["t"];
 
 /** Events readable by anyone holding the invitation (so newcomers can join). */
-export const CONTROL: ReadonlySet<EventType> = new Set(["genesis", "vouch", "admit", "key"]);
+export const CONTROL: ReadonlySet<EventType> = new Set([
+  "genesis",
+  "request",
+  "vouch",
+  "admit",
+  "key",
+]);
 
 // ---------------------------------------------------------------------------
 // Canonical form, ids and signed messages
@@ -194,6 +225,10 @@ export function voteTag(groupId: Uint8Array, pollId: string): Bytes {
 
 export function pledgeTag(groupId: Uint8Array, actionId: string): Bytes {
   return concat(utf8("agora/v1/tag/pledge:"), groupId, utf8(actionId));
+}
+
+export function requestContext(groupId: Uint8Array): Bytes {
+  return concat(utf8("agora/v1/request:"), groupId);
 }
 
 export function boxContext(groupId: Uint8Array, kid: string): Bytes {
@@ -260,6 +295,10 @@ export function parseEvent(raw: unknown): AgoraEvent | null {
       if (p.vouches === 0 && p.issuers.length === 0) return null;
       return raw as unknown as Genesis;
     }
+    case "request":
+      if (!isKey(e.to) || !isBin(e.box) || !isBin(e.sig, 64)) return null;
+      if (fromB64u(e.box).length > 1024) return null;
+      return raw as unknown as RequestEvent;
     case "vouch":
       if (!isCard(e.for) || !isKey(e.by) || !isBin(e.sig, 64)) return null;
       return raw as unknown as VouchEvent;
@@ -304,6 +343,11 @@ export function parseEvent(raw: unknown): AgoraEvent | null {
     default:
       return null;
   }
+}
+
+/** A card from untrusted JSON, or null. */
+export function asCard(v: unknown): MemberCard | null {
+  return isCard(v) ? { key: v.key, box: v.box, ...(v.name ? { name: v.name } : {}) } : null;
 }
 
 /** A choice is valid for a given poll (the parser only knows the global bounds). */

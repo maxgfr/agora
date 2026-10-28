@@ -11,6 +11,7 @@ import {
 import type { GroupView } from "../../model/group";
 import type { GroupSession } from "../../model/session";
 import { CodeBox, CodeInput } from "../components/Codes";
+import { useIntent } from "../components/useIntent";
 import { t } from "../i18n";
 
 function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
@@ -18,6 +19,11 @@ function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
   void s.recordRev.value;
   const [answer, setAnswer] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
+  const [prefill, setPrefill] = useState<string | null>(null);
+  const [orgPrefill, setOrgPrefill] = useState<string | null>(null);
+  // Codes read by the app's scanner: the organizer still confirms with one tap.
+  useIntent(s.record.id, "request", (i) => setPrefill(i.text));
+  useIntent(s.record.id, "organizer", (i) => setOrgPrefill(i.text));
   const org = s.record.organizer?.[0];
   const byTicket = view.members.filter((m) => m.via === "ticket").length;
   if (!org) {
@@ -28,11 +34,13 @@ function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
           label={t("exportOrganizer")}
           submit={t("save")}
           testId="organizer-input"
+          prefill={orgPrefill}
           onCode={(text) => {
-            const secret = parseOrganizer(text);
-            if (!secret) return t("invalidOrganizer");
+            const parsed = parseOrganizer(text);
+            if (!parsed) return t("invalidOrganizer");
+            if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
             try {
-              s.addOrganizerKey(secret);
+              s.addOrganizerKey(parsed.value);
               return null;
             } catch {
               return t("invalidOrganizer");
@@ -50,11 +58,14 @@ function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
         label={t("pasteRequest")}
         submit={t("signTicket")}
         testId="request-input"
+        prefill={prefill}
         onCode={(text) => {
-          const req = parseRequest(text);
-          if (!req) return t("invalidRequest");
+          const parsed = parseRequest(text);
+          if (!parsed) return t("invalidRequest");
+          if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
           try {
-            setAnswer(answerCode(s.signTicket(req)));
+            setPrefill(null);
+            setAnswer(answerCode(s.record.id, s.signTicket(parsed.value)));
             return null;
           } catch {
             return t("invalidRequest");
@@ -75,7 +86,7 @@ function TicketDesk(props: { s: GroupSession; view: GroupView }): JSX.Element {
         <p class="hint">{t("exportOrganizerHint")}</p>
         {showKey && (
           <CodeBox
-            code={organizerCode(fromB64u(org.secret))}
+            code={organizerCode(s.record.id, fromB64u(org.secret))}
             label={t("exportOrganizer")}
             testId="organizer-key"
           />

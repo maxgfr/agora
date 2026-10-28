@@ -27,12 +27,16 @@ export function Home(): JSX.Element {
           {list.map((g) => {
             const view = session(g.id)?.view.value;
             const isMember = !!view?.me;
+            const asking = session(g.id)?.requests.value.length ?? 0;
             return (
               <li key={g.id}>
                 <Link to={{ name: "group", id: g.id }} class="tile">
                   <span class="tile-title">{g.name || view?.genesis?.name || "…"}</span>
                   <span class="tile-meta">
                     {view?.genesis ? membersLabel(view.members.length) : t("loadingGroup")}
+                    {asking > 0 && (
+                      <span class="badge badge-warn">{t("requestsCount", { n: asking })}</span>
+                    )}
                     {view?.genesis && !isMember && (
                       <span class="badge badge-warn">{t("pending")}</span>
                     )}

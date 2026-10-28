@@ -51,6 +51,9 @@ export function plan(
     switch (ev.t) {
       case "genesis":
         return schnorrVerify(DOMAIN.pop, fromB64u(ev.founder.key), msg, sig);
+      case "request":
+        // Its signer is inside the box: the recipient checks it (session.ts), nobody else can.
+        return true;
       case "vouch":
         return schnorrVerify(DOMAIN.vouch, fromB64u(ev.by), vouchMessage(groupId, ev.for), sig);
       case "admit": {

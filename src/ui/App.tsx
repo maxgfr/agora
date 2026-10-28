@@ -1,7 +1,8 @@
 import type { JSX } from "preact";
-import { phase, route, saveError, takeOver } from "../app/state";
+import { phase, route, saveError, scanOpen, takeOver } from "../app/state";
 import { Link } from "./components/Link";
 import { Logo } from "./components/Logo";
+import { ScanSheet } from "./components/ScanSheet";
 import { lang, setLang, t } from "./i18n";
 import { applyUpdate, updateReady } from "./pwa";
 import { CreateGroup } from "./screens/CreateGroup";
@@ -55,6 +56,18 @@ export function App(): JSX.Element {
             {lang.value === "fr" ? "EN" : "FR"}
           </button>
           {p === "ready" && (
+            <button
+              type="button"
+              class="btn btn-small"
+              data-testid="scan"
+              onClick={() => {
+                scanOpen.value = true;
+              }}
+            >
+              {t("scan")}
+            </button>
+          )}
+          {p === "ready" && (
             <Link to={{ name: "settings" }} class="btn btn-small btn-ghost">
               {t("settings")}
             </Link>
@@ -89,6 +102,7 @@ export function App(): JSX.Element {
         )}
         {p === "ready" && <Screen />}
       </main>
+      {p === "ready" && <ScanSheet />}
       <footer class="footer">
         <a href="https://github.com/maxgfr/agora" rel="noreferrer" target="_blank">
           {t("source")}
