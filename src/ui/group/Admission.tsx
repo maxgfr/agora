@@ -124,26 +124,53 @@ function TicketPath(props: { s: GroupSession; view: GroupView }): JSX.Element {
   const rec = s.record;
   const issuers = props.view.policy?.issuers ?? [];
   const [delay, setDelay] = useState(true);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   if (rec.pendingAdmit) return <AdmitCountdown s={s} at={rec.pendingAdmit.at} />;
-  if (!rec.ticket) {
-    return (
-      <button
-        type="button"
-        class="btn btn-primary"
-        onClick={() => s.requestTicket(issuers[0] as string)}
-      >
-        {t("requestTicket")}
-      </button>
-    );
-  }
+  const delayMs = () => (delay ? randomDelay() : 0);
   return (
     <div class="stack">
-      <h3>{t("yourRequest")}</h3>
-      <CodeBox
-        code={requestCode(s.record.id, fromB64u(rec.ticket.request))}
-        label={t("yourRequest")}
-        testId="ticket-request"
-      />
+      <form
+        class="row"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError(null);
+          try {
+            await s.usePassword(password, delayMs());
+          } catch (err) {
+            const why = err instanceof Error ? err.message : "";
+            setError(why === "used" ? t("passwordUsed") : t("passwordUnknown"));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <input
+          class="grow password-input"
+          value={password}
+          maxLength={20}
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck={false}
+          placeholder="XXXX-XXXX-XXXX"
+          aria-label={t("entryPassword")}
+          data-testid="entry-password"
+          onInput={(e) => {
+            setPassword(e.currentTarget.value);
+            setError(null);
+          }}
+        />
+        <button type="submit" class="btn btn-primary" disabled={busy || !password.trim()}>
+          {t("enter")}
+        </button>
+      </form>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
       <label class="check">
         <input
           type="checkbox"
@@ -156,24 +183,40 @@ function TicketPath(props: { s: GroupSession; view: GroupView }): JSX.Element {
           <small class="hint">{t("delayAdmitHint")}</small>
         </span>
       </label>
-      <CodeInput
-        prefill={prefill}
-        label={t("pasteAnswer")}
-        submit={t("validateTicket")}
-        testId="ticket-answer"
-        onCode={async (text) => {
-          const parsed = parseAnswer(text);
-          if (!parsed) return t("invalidAnswer");
-          if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
-          const answer = parsed.value;
-          try {
-            await s.acceptTicket(answer, delay ? randomDelay() : 0);
-            return null;
-          } catch {
-            return t("invalidAnswer");
-          }
-        }}
-      />
+      <details class="other-method" open={!!rec.ticket || !!prefill}>
+        <summary>{t("scannedMethodNewcomer")}</summary>
+        {!rec.ticket ? (
+          <button type="button" class="btn" onClick={() => s.requestTicket(issuers[0] as string)}>
+            {t("requestTicket")}
+          </button>
+        ) : (
+          <div class="stack">
+            <h3>{t("yourRequest")}</h3>
+            <CodeBox
+              code={requestCode(s.record.id, fromB64u(rec.ticket.request))}
+              label={t("yourRequest")}
+              testId="ticket-request"
+            />
+            <CodeInput
+              label={t("pasteAnswer")}
+              submit={t("validateTicket")}
+              testId="ticket-answer"
+              prefill={prefill}
+              onCode={async (text) => {
+                const parsed = parseAnswer(text);
+                if (!parsed) return t("invalidAnswer");
+                if (parsed.groupId && parsed.groupId !== s.record.id) return t("codeWrongGroup");
+                try {
+                  await s.acceptTicket(parsed.value, delayMs());
+                  return null;
+                } catch {
+                  return t("invalidAnswer");
+                }
+              }}
+            />
+          </div>
+        )}
+      </details>
     </div>
   );
 }

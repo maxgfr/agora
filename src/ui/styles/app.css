@@ -830,3 +830,23 @@ details.forgot summary {
   color: var(--muted);
   font-size: 0.9rem;
 }
+.password {
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  user-select: all;
+}
+.password-input {
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+details.other-method summary {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+details.other-method[open] summary {
+  margin-bottom: 12px;
+}

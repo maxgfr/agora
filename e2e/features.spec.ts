@@ -187,16 +187,17 @@ test("a co-organizer signs tickets with an exported organizer key", async ({ bro
   await bob.page.getByRole("button", { name: "Save" }).click();
   await expect(bob.page.getByTestId("ticket-desk")).toBeVisible();
 
+  // Bob makes a password; Carol types it.
+  await bob.page.getByTestId("make-passwords").click();
+  const password = await text(bob, "password");
   await open(carol, fragment);
   await carol.page.getByRole("button", { name: "Join", exact: true }).click();
-  await carol.page.getByRole("button", { name: "Ask for a ticket" }).click();
-  const request = await text(carol, "ticket-request");
-  await bob.page.getByTestId("request-input").fill(request);
-  await bob.page.getByRole("button", { name: "Sign the ticket" }).click();
-  const answer = await text(bob, "ticket-answer-code");
+  await carol.page.getByTestId("entry-password").fill("ABCD-EFGH-JKMN");
+  await carol.page.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(carol.page.getByRole("alert")).toContainText("is not known in this group");
   // Left checked: the admission waits a random delay, counts it down, and can be hurried.
-  await carol.page.getByTestId("ticket-answer").fill(answer);
-  await carol.page.getByRole("button", { name: "Use the ticket" }).click();
+  await carol.page.getByTestId("entry-password").fill(password);
+  await carol.page.getByRole("button", { name: "Join", exact: true }).click();
   const wait = carol.page.getByTestId("admit-scheduled");
   await expect(wait).toContainText(/Valid ticket: you join the group in \d+:\d\d/);
   const first = await wait.textContent();
@@ -207,7 +208,19 @@ test("a co-organizer signs tickets with an exported organizer key", async ({ bro
   await expect(ada.page.getByTestId("members").locator(".member")).toHaveCount(3, {
     timeout: 20_000,
   });
-  await close(ada, bob, carol);
+  // The same password again, by someone else: refused.
+  const dan = await person(browser, "Dan");
+  await open(dan, fragment);
+  await dan.page.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(dan.page.getByTestId("group-name")).toHaveText("Desk");
+  await expect
+    .poll(async () => {
+      await dan.page.getByTestId("entry-password").fill(password);
+      await dan.page.getByRole("button", { name: "Join", exact: true }).click();
+      return dan.page.getByRole("alert").textContent();
+    })
+    .toContain("already used");
+  await close(ada, bob, carol, dan);
 });
 
 test("a motion to exclude passes; the excluded member is told and left out", async ({

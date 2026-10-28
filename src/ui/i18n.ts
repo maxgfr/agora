@@ -38,9 +38,9 @@ const fr = {
   byVouchHint:
     "Un nouveau venu entre quand {k} membres se portent garants de lui (en personne, en scannant son code). Tant que le groupe compte moins de {k} membres, tous doivent le parrainer.",
   vouchCount: "Parrains requis",
-  byTicket: "Tickets d'organisateur",
+  byTicket: "Mots de passe d'entrée (organisateur)",
   byTicketHint:
-    "Vous vérifiez chaque personne à votre façon (en personne, sur une liste…) et lui signez un ticket à l'aveugle : vous saurez qui en a reçu un, jamais quelle voix vient de quel ticket. Vous devenez un tiers de confiance : un organisateur malhonnête pourrait créer de faux membres.",
+    "Vous vérifiez chaque personne à votre façon (en personne, sur une liste…) et lui donnez un mot de passe d'entrée à usage unique. Vous saurez à qui vous en avez donné un, jamais avec lequel chacun est entré : les votes restent anonymes. Vous devenez un tiers de confiance : un organisateur malhonnête pourrait créer de faux membres.",
   needOne: "Choisissez au moins un mode d'entrée.",
   create: "Créer le groupe",
   // Join
@@ -69,9 +69,9 @@ const fr = {
   vouchesReceived: "Parrainages reçus : {n}/{k}",
   fingerprintHint:
     "À distance ? Envoyez le code, puis comparez ces emojis de vive voix avec la personne qui vous parraine.",
-  ticketPath: "Par ticket d'organisateur",
+  ticketPath: "Avec un mot de passe d'entrée",
   ticketPathHint:
-    "Montrez ce code à un organisateur après qu'il a vérifié votre identité. Il le signe sans le voir : votre admission ne sera pas reliable à votre identité.",
+    "Un organisateur vous a vérifié ? Il vous donne un mot de passe d'entrée : tapez-le ici.",
   requestTicket: "Demander un ticket",
   yourRequest: "Votre demande, à montrer à l'organisateur",
   pasteAnswer: "Code de réponse de l'organisateur",
@@ -85,6 +85,22 @@ const fr = {
   admitCountdownHint:
     "Cette attente est voulue (elle protège votre anonymat face à l'organisateur). Vous pouvez quitter l'appli, l'entrée se fera à la prochaine ouverture.",
   admitNow: "Entrer maintenant",
+  entryPassword: "Mot de passe d'entrée",
+  relaysAnswering: "Relais qui répondent : {n}/{total}",
+  searchingLong:
+    "Toujours rien ? Le groupe arrive dès qu'un relais ou un membre en ligne répond. Vérifiez votre connexion, ou demandez à un membre d'ouvrir l'appli en même temps : vos appareils se synchroniseront directement. Si le lien est ancien, demandez-en un nouveau.",
+  enter: "Entrer",
+  passwordUnknown:
+    "Ce mot de passe n'est pas (encore) connu dans ce groupe. Vérifiez-le, ou réessayez dans un instant s'il vient d'être créé.",
+  passwordUsed: "Ce mot de passe a déjà servi. Demandez-en un autre à l'organisateur.",
+  scannedMethodNewcomer: "Autre méthode : demander un ticket à faire scanner",
+  scannedMethod: "Autre méthode : signer une demande scannée",
+  scannedMethodHint:
+    "La personne clique sur « Demander un ticket » et vous montre le code : collez-le ou scannez-le ici, puis montrez-lui la réponse.",
+  passwordCount: "Combien de mots de passe",
+  makePassword: "Créer un mot de passe",
+  makePasswords: "Créer {n} mots de passe",
+  passwordsUsed: "{used} utilisé(s) sur {n}",
   // Polls
   newPoll: "Nouveau sondage",
   question: "Question",
@@ -149,9 +165,9 @@ const fr = {
   inviteTitle: "Lien d'invitation",
   inviteHint:
     "Toute personne qui a ce lien peut lire le groupe et demander à entrer, mais ne peut voter qu'une fois admise. Envoyez-le par un canal de confiance.",
-  ticketDesk: "Admettre par ticket (organisateur)",
+  ticketDesk: "Mots de passe d'entrée (organisateur)",
   ticketDeskHint:
-    "Pour quelqu'un que vous avez vérifié vous-même (pièce d'identité, liste d'adhérents, en personne) et qui n'a pas de parrain dans le groupe. Il clique sur « Demander un ticket » et vous montre le code obtenu : collez-le ou scannez-le ici, signez, puis montrez-lui la réponse. Votre signature est aveugle : vous savez à qui vous avez donné un ticket, jamais avec quelle clé il votera.",
+    "Pour quelqu'un que vous avez vérifié vous-même (pièce d'identité, liste d'adhérents, en personne) et que personne ne peut parrainer : créez un mot de passe et donnez-le-lui, de vive voix, sur papier ou par message. Il le tape dans l'appli et entre. Chacun ne sert qu'une fois, et vous ne saurez jamais lequel a servi à quel membre : ses votes restent anonymes, même pour vous.",
   pasteRequest: "Demande de ticket",
   invalidRequest: "Ce n'est pas une demande de ticket.",
   signTicket: "Signer le ticket",
@@ -248,9 +264,9 @@ const fr = {
   stepVouch: "2. Parrainez-la",
   stepVouchHint:
     "Elle vous le demande depuis l'appli (sa demande apparaît en haut de cette page), ou vous scannez sa carte avec le bouton Scanner, ou vous collez son code ici.",
-  stepTicket: "2. Ou admettez-la par ticket",
+  stepTicket: "2. Ou donnez-lui un mot de passe d'entrée",
   stepTicketHint:
-    "Si personne ne peut la parrainer : vérifiez qui elle est, puis signez sa demande de ticket dans la section ci-dessous.",
+    "Si personne ne peut la parrainer : vérifiez qui elle est, créez-lui un mot de passe ci-dessous et donnez-le-lui.",
   showQr: "Afficher le QR code",
   hideQr: "Masquer le QR code",
   forgotPassphrase: "Phrase de passe oubliée ?",
@@ -303,9 +319,9 @@ const en: Dict = {
   byVouchHint:
     "A newcomer gets in once {k} members vouch for them (in person, by scanning their code). While the group has fewer than {k} members, all of them must vouch.",
   vouchCount: "Vouches needed",
-  byTicket: "Organizer tickets",
+  byTicket: "Entry passwords (organizer)",
   byTicketHint:
-    "You check each person your own way (in person, against a list…) and sign them a ticket blind: you will know who got one, never which vote comes from which ticket. You become a trusted party: a dishonest organizer could create fake members.",
+    "You check each person your own way (in person, against a list…) and give them a one-time entry password. You will know whom you gave one to, never which one each used: votes stay anonymous. You become a trusted party: a dishonest organizer could create fake members.",
   needOne: "Pick at least one way in.",
   create: "Create the group",
   joinTitle: "Join",
@@ -331,9 +347,8 @@ const en: Dict = {
   vouchesReceived: "Vouches received: {n}/{k}",
   fingerprintHint:
     "Remotely? Send the code, then compare these emojis out loud with the person vouching for you.",
-  ticketPath: "With an organizer ticket",
-  ticketPathHint:
-    "Show this code to an organizer once they have checked who you are. They sign it without seeing it: your admission cannot be linked to your identity.",
+  ticketPath: "With an entry password",
+  ticketPathHint: "Checked by an organizer? They give you an entry password: type it here.",
   requestTicket: "Ask for a ticket",
   yourRequest: "Your request, to show the organizer",
   pasteAnswer: "The organizer's answer code",
@@ -347,6 +362,22 @@ const en: Dict = {
   admitCountdownHint:
     "This wait is on purpose (it protects your anonymity from the organizer). You can leave the app: you will join when it opens next.",
   admitNow: "Join now",
+  entryPassword: "Entry password",
+  relaysAnswering: "Relays answering: {n}/{total}",
+  searchingLong:
+    "Still nothing? The group arrives as soon as a relay or an online member answers. Check your connection, or ask a member to open the app at the same time: your devices will sync directly. If the link is old, ask for a new one.",
+  enter: "Join",
+  passwordUnknown:
+    "This password is not known in this group (yet). Check it, or try again in a moment if it was just made.",
+  passwordUsed: "This password was already used. Ask the organizer for another one.",
+  scannedMethodNewcomer: "Another way: ask for a ticket to be scanned",
+  scannedMethod: "Another way: sign a scanned request",
+  scannedMethodHint:
+    'The person taps "Ask for a ticket" and shows you the code: paste or scan it here, then show them the answer.',
+  passwordCount: "How many passwords",
+  makePassword: "Make a password",
+  makePasswords: "Make {n} passwords",
+  passwordsUsed: "{used} used of {n}",
   newPoll: "New poll",
   question: "Question",
   options: "Answers",
@@ -407,9 +438,9 @@ const en: Dict = {
   inviteTitle: "Invitation link",
   inviteHint:
     "Anyone with this link can read the group and ask to join, but can only vote once admitted. Send it over a channel you trust.",
-  ticketDesk: "Admit with a ticket (organizer)",
+  ticketDesk: "Entry passwords (organizer)",
   ticketDeskHint:
-    'For someone you checked yourself (an ID, a membership list, in person) who has no one in the group to vouch for them. They tap "Ask for a ticket" and show you the code: paste or scan it here, sign, then show them the answer. Your signature is blind: you know whom you gave a ticket to, never which key they will vote with.',
+    "For someone you checked yourself (an ID, a membership list, in person) whom nobody can vouch for: make a password and give it to them, out loud, on paper or by message. They type it in the app and they are in. Each works once, and you will never know which one let in which member: their votes stay anonymous, even to you.",
   pasteRequest: "Ticket request",
   invalidRequest: "This is not a ticket request.",
   signTicket: "Sign the ticket",
@@ -504,9 +535,9 @@ const en: Dict = {
   stepVouch: "2. Vouch for them",
   stepVouchHint:
     "They ask you from the app (their request shows at the top of this page), or you scan their card with the Scan button, or paste their code here.",
-  stepTicket: "2. Or admit them with a ticket",
+  stepTicket: "2. Or give them an entry password",
   stepTicketHint:
-    "If nobody can vouch for them: check who they are, then sign their ticket request in the section below.",
+    "If nobody can vouch for them: check who they are, make them a password below and give it to them.",
   showQr: "Show the QR code",
   hideQr: "Hide the QR code",
   forgotPassphrase: "Forgot the passphrase?",

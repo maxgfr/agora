@@ -22,6 +22,7 @@ import {
   type Genesis,
   type KeyEvent,
   type MemberCard,
+  type PassBatch,
   type Pledge,
   type Policy,
   type Poll,
@@ -81,12 +82,23 @@ export interface GroupView {
   needsGrant: MemberCard[];
   /** The current key, when it is not the link key. */
   currentKey?: Bytes;
+  /** Entry password batches from the group's organizers. */
+  passBatches: PassBatchView[];
 }
 
 interface Item {
   at: number;
   id: string;
-  ev: Admit | Poll | Action | KeyEvent;
+  ev: Admit | Poll | Action | KeyEvent | PassBatch;
+}
+
+export interface PassBatchView {
+  id: string;
+  batch: PassBatch;
+  /** Passwords of the batch already used (which ones, nobody can tell). */
+  used: number;
+  /** Key images already spent, to tell a newcomer their password was used. */
+  spent: Set<string>;
 }
 
 const imageOf = (sig: string) => toHex(fromB64u(sig).subarray(0, 32));
@@ -133,6 +145,7 @@ export function fold(
     writeKey: g.linkKey,
     needsRekey: false,
     needsGrant: [],
+    passBatches: [],
   };
   const genesis = events.get(genesisId);
   if (genesis?.t !== "genesis" || !valid.has(genesisId)) return view;
@@ -155,12 +168,15 @@ export function fold(
       list.push([id, ev]);
       pledges.set(ev.action, list);
     } else if (ev.t === "admit") items.push({ at: ev.ts, id, ev });
+    // A batch counts a little before its own time: an admission may follow it closely.
+    else if (ev.t === "passes") items.push({ at: ev.ts - SKEW_MS, id, ev });
     else if (ev.t === "poll" || ev.t === "action" || ev.t === "key")
       items.push({ at: ev.ts + SKEW_MS, id, ev });
   }
   items.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   const roster = new Map<string, MemberView>();
+  const batches = new Map<string, PassBatchView>();
   const burned = new Set<string>();
   roster.set(genesis.founder.key, {
     ...genesis.founder,
@@ -219,7 +235,15 @@ export function fold(
       const need = Math.min(policy.vouches, members.length);
       const byVouch = policy.vouches > 0 && need > 0 && vouchers.length >= need;
       const byTicket = !!ev.ticket && policy.issuers.includes(ev.ticket.issuer);
-      if (!byVouch && !byTicket) continue;
+      // An entry password: from a batch of the group's organizers, never used before.
+      const pb = ev.pass ? batches.get(ev.pass.batch) : undefined;
+      const passImage = ev.pass ? imageOf(ev.pass.sig) : "";
+      const byPass = !!pb && !pb.spent.has(passImage);
+      if (!byVouch && !byTicket && !byPass) continue;
+      if (!byVouch && !byTicket && pb) {
+        pb.spent.add(passImage);
+        pb.used++;
+      }
       const m: MemberView = {
         ...ev.member,
         via: byVouch ? "vouch" : "ticket",
@@ -227,7 +251,11 @@ export function fold(
         admittedAt: ev.ts,
       };
       if (!byVouch && ev.ticket) m.issuer = ev.ticket.issuer;
+      else if (!byVouch && !byTicket && pb) m.issuer = pb.batch.issuer;
       roster.set(key, m);
+    } else if (ev.t === "passes") {
+      if (policy.issuers.includes(ev.issuer))
+        batches.set(it.id, { id: it.id, batch: ev, used: 0, spent: new Set() });
     } else if (ev.t === "poll" || ev.t === "action") {
       if (!ev.ring.every((k) => isMember(k, ev.ts))) continue;
       const rosterSize = current().length;
@@ -240,6 +268,7 @@ export function fold(
     }
   }
   applyMotions(now);
+  view.passBatches = [...batches.values()];
 
   for (const m of roster.values())
     (m.excludedAt === undefined ? view.members : view.excluded).push(m);

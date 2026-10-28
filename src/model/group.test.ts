@@ -7,11 +7,14 @@ import {
   createAdmit,
   createGenesis,
   createKeyEvent,
+  createPassBatch,
   createPledge,
   createPoll,
   createVote,
   type Me,
   newMe,
+  normalizePassword,
+  passProof,
   ticketRequest,
   vouchFor,
 } from "./author";
@@ -340,4 +343,66 @@ test("forged ring signatures are rejected", async () => {
   );
   c.add({ ...poll, q: "edited" });
   expect((await c.view()).polls).toHaveLength(0);
+});
+
+describe("entry passwords", () => {
+  test("a password admits once, anonymously; a second use and another organizer's do not", async () => {
+    const org = newIssuer();
+    const w = world({ vouches: 0, issuers: [toB64u(org.pub)] });
+    const { event, passwords } = createPassBatch(w.g, org, 3, 1_500_000);
+    const bid = w.add(event);
+    expect(passwords).toHaveLength(3);
+    for (const p of passwords)
+      expect(p).toMatch(/^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/);
+    expect(normalizePassword(` ${passwords[0]?.toLowerCase().replaceAll("-", " ")} `)).toBe(
+      passwords[0]?.replaceAll("-", "") as string,
+    );
+    const pw = (i: number) => normalizePassword(passwords[i] as string) as string;
+
+    const ann = newMe("ann");
+    w.add(
+      createAdmit(
+        w.g,
+        ann,
+        { vouches: [], pass: passProof(w.g, ann, event, bid, pw(1)) },
+        2_000_000,
+      ),
+    );
+    // The same password again, for someone else: refused.
+    const bo = newMe("bo");
+    w.add(
+      createAdmit(w.g, bo, { vouches: [], pass: passProof(w.g, bo, event, bid, pw(1)) }, 2_100_000),
+    );
+    // Another password of the batch: fine.
+    const cy = newMe("cy");
+    w.add(
+      createAdmit(w.g, cy, { vouches: [], pass: passProof(w.g, cy, event, bid, pw(2)) }, 2_200_000),
+    );
+    let v = await w.view();
+    expect(v.members.map((m) => m.name)).toEqual(["ada", "ann", "cy"]);
+    expect(v.members[1]?.via).toBe("ticket");
+    expect(v.passBatches[0]?.used).toBe(2);
+
+    // A batch signed by an organizer of no policy admits nobody.
+    const rogue = newIssuer();
+    const other = createPassBatch(w.g, rogue, 1, 2_300_000);
+    const oid = w.add(other.event);
+    const dee = newMe("dee");
+    const p0 = normalizePassword(other.passwords[0] as string) as string;
+    w.add(
+      createAdmit(
+        w.g,
+        dee,
+        { vouches: [], pass: passProof(w.g, dee, other.event, oid, p0) },
+        2_400_000,
+      ),
+    );
+    // Nor does a proof made for another newcomer's card.
+    const eve = newMe("eve");
+    const stolen = passProof(w.g, newMe("x"), event, bid, pw(0));
+    w.add(createAdmit(w.g, eve, { vouches: [], pass: stolen }, 2_500_000));
+    v = await w.view();
+    expect(v.members.map((m) => m.name)).toEqual(["ada", "ann", "cy"]);
+    expect(v.passBatches).toHaveLength(1);
+  });
 });

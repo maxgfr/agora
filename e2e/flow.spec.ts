@@ -48,19 +48,20 @@ test("a group: vouching, a blind ticket, a poll, a changed vote and an action", 
   await admitted(bob);
   await expect(ada.page.getByTestId("members").locator(".member")).toHaveCount(2);
 
-  // Carol gets a blind ticket from Ada, the organizer.
+  // Carol gets an entry password from Ada, the organizer, and types it.
+  await tab(ada, "Members");
+  await ada.page.getByTestId("make-passwords").click();
+  const password = await text(ada, "password");
+  await expect(ada.page.getByTestId("passwords")).toContainText("0 used of 1");
   await open(carol, fragment);
   await carol.page.getByRole("button", { name: "Join", exact: true }).click();
-  await carol.page.getByRole("button", { name: "Ask for a ticket" }).click();
-  const request = await text(carol, "ticket-request");
-  await tab(ada, "Members");
-  await ada.page.getByTestId("request-input").fill(request);
-  await ada.page.getByRole("button", { name: "Sign the ticket" }).click();
-  const answer = await text(ada, "ticket-answer-code");
   await carol.page.getByTestId("delay-admit").uncheck();
-  await carol.page.getByTestId("ticket-answer").fill(answer);
-  await carol.page.getByRole("button", { name: "Use the ticket" }).click();
+  await carol.page.getByTestId("entry-password").fill(password.toLowerCase());
+  await carol.page.getByRole("button", { name: "Join", exact: true }).click();
   await admitted(carol);
+  await expect(ada.page.getByTestId("passwords")).toContainText("1 used of 1", {
+    timeout: 20_000,
+  });
   await tab(carol, "Members");
   await expect(carol.page.getByTestId("members").locator(".member")).toHaveCount(3);
   await expect(carol.page.getByText("joined with a ticket")).toBeVisible();

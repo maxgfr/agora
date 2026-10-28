@@ -9,7 +9,7 @@
 | Nobody knows who voted what | The ring signature does not reveal which member of the ring signed (anonymity under DDH in ristretto255). Key images of the same member in two polls are unrelated, so votes cannot be linked across polls. Poll creators are anonymous too. |
 | Members are real people | Admission requires `k` vouches from current members, or a blind ticket from an organizer of the group. |
 | Asking a member | A newcomer types the member's pseudonym, and the form never says whether it exists (a request always reads as sent): the app never shows the member list to non-members (though anyone holding the link could read the admissions and their names). The request is boxed to that member, so other holders of the link see neither who asks nor whom. |
-| The organizer cannot link a ticket to a vote | The ticket is a blind BLS signature: the organizer never sees the member key it certifies, and the admission is published after a random delay. |
+| The organizer cannot link a ticket to a vote | An entry password is proven with a ring signature over its whole batch: the organizer, who knows whom they gave which password, cannot tell which one was used. A scanned ticket is a blind BLS signature: the organizer never sees the member key it certifies. Either way the admission is published after a random delay. |
 | Excluded members lose access | An exclusion removes the key from future rings and is followed by a new group key boxed to the remaining members only. |
 | Keys at rest | Optional passphrase lock (Argon2id + XChaCha20-Poly1305) of the profile on the device. |
 | The page itself | Strict CSP (`script-src 'self'`, no inline script or style), Trusted Types, frame busting, a service worker that checks the SHA-256 of every cached file. |
@@ -20,6 +20,8 @@
   and create fake members. The members list shows how many came in with a ticket, and the
   organizer's desk counts tickets signed, so a group can compare with the people it knows.
   In vouching mode, colluding members can vouch for fake members in the same way.
+- **An entry password is a bearer secret.** Whoever types it first gets in, and the person it
+  was meant for is then refused: hand it over privately. It is only usable in its own group.
 - **The link is read access.** Anyone holding the invitation can read the group's admissions and,
   until the first exclusion, its content. Send it over a channel you trust.
 - **No coercion resistance.** A member can prove how they voted by revealing their secret key

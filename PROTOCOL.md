@@ -45,7 +45,7 @@ Plaintext is at most 96 KiB. On the wire a sealed event is base64url. Its **wire
 `SHA-256(canonical(event))[0..16]`, hex, where `canonical` is JSON with sorted keys; ids name
 polls and actions independently of how they were sealed.
 
-`genesis`, `request`, `vouch`, `admit` and `key` events are sealed with the link key, so that a newcomer
+`genesis`, `request`, `passes`, `vouch`, `admit` and `key` events are sealed with the link key, so that a newcomer
 holding only the invitation can follow admissions. Content events (`poll`, `vote`, `action`,
 `pledge`) are sealed with the newest key the author holds.
 
@@ -85,8 +85,14 @@ All carry `t` (type), `ts` (milliseconds) and `sig`. Binary fields are base64url
   `box = boxSeal(to, JSON {card}, "agora/v1/request:" ‖ groupId)`; `sig` is the newcomer's pop
   signature, checked by the recipient against the key inside the box (nobody else can check it,
   nor see who asks)
+- `passes {issuer, keys[], nonce, sig: BLS}` — a batch of one-time entry passwords: each password
+  `p` (12 symbols of `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, ~59 bits) stands for the key
+  `keyPairFromSeed("agora/v1/pass-key:" ‖ groupId ‖ p)`; only the public keys are listed, signed
+  by the organizer (BLS, DST `AGORA-V1-ISSUER_…`)
 - `vouch {for: card, by, sig: vouch}` — a vouch published for the newcomer's device to collect
-- `admit {member: card, vouches: [{by, sig}], ticket?: {issuer, sig}, sig: pop}`
+- `admit {member: card, vouches: [{by, sig}], ticket?: {issuer, sig}, pass?: {batch, sig}, sig: pop}`
+  — `pass.sig` is an LSAG over the batch's keys, tag `"agora/v1/tag/pass:" ‖ groupId ‖ batch`,
+  message `SHA-256("agora/v1/pass" ‖ groupId ‖ key ‖ box)`: its key image spends the password
 - `poll {q, options[2..20], multi, closes, ring[], nonce, exclude?, sig: LSAG(create)}`
 - `vote {poll, choice[], seq, sig: LSAG(vote)}`
 - `action {title, details, threshold, closes, ring[], nonce, sig: LSAG(create)}`
@@ -104,8 +110,9 @@ Every device folds the events whose signatures check, deterministically
 1. The genesis named by the invitation sets the policy; its founder is the first member.
 2. Admissions, polls, actions and key events are replayed in time order (polls, actions and keys
    at `ts + 5 min`, to tolerate clock skew). An `admit` counts if its key is new and not excluded,
-   and either it carries vouches from at least `min(k, members)` distinct current members, or a
-   ticket from one of the policy's organizers.
+   and either it carries vouches from at least `min(k, members)` distinct current members, a
+   ticket from one of the policy's organizers, or a password proof over a batch from one of them
+   whose key image was not spent before (batches count from `ts − 5 min`).
 3. A `poll` or `action` counts if every key of its ring was a member at `ts`.
 4. Votes: for each poll, the valid votes with `ts ≤ closes`; per key image, the highest `seq`
    (then the lowest id). Pledges the same way, for actions; an action is reached when the pledges

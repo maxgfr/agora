@@ -43,3 +43,17 @@ test("a signature checker that never answers does not freeze the group", async (
   await expect(bob.page.getByTestId("diagnostics")).toContainText("Signature checker restarts: 1");
   await close(ada, bob);
 });
+
+test("joining while no relay answers says so, instead of a silent spinner", async ({ browser }) => {
+  const ada = await person(browser, "Ada");
+  await open(ada);
+  const fragment = await found(ada, "Unreachable");
+  // Bob's relays are all down (nothing listens there) and nobody is online for him.
+  const bob = await person(browser, "Bob", { relays: ["ws://localhost:9/none"], torrent: false });
+  await open(bob, fragment);
+  await bob.page.getByRole("button", { name: "Join", exact: true }).click();
+  const searching = bob.page.getByTestId("searching");
+  await expect(searching).toContainText("Relays answering: 0/1");
+  await expect(searching).toContainText("Still nothing?", { timeout: 15_000 });
+  await close(ada, bob);
+});

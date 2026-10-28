@@ -89,6 +89,7 @@ test("the app-wide scanner opens invitations, cards and ticket codes", async ({ 
 
   // Dan uses a ticket: his request goes to Ada's desk, her answer back to him.
   await join(dan, fragment);
+  await dan.page.getByText("Another way: ask for a ticket to be scanned").click();
   await dan.page.getByRole("button", { name: "Ask for a ticket" }).click();
   const request = await text(dan, "ticket-request");
   await scan(ada, request);

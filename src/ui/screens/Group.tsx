@@ -1,4 +1,5 @@
 import type { JSX } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import { type GroupTab, go, groups, leaveGroup, session, sessionsVersion } from "../../app/state";
 import type { GroupSession } from "../../model/session";
 import { Link } from "../components/Link";
@@ -26,6 +27,28 @@ function Status(props: { s: GroupSession }): JSX.Element {
       {peers > 0 && <span>· {t("peers", { n: peers })}</span>}
       {verifying && <span>· {t("verifying", verifying)}</span>}
     </p>
+  );
+}
+
+/** Waiting for the group's first events: say what the network is doing, and what to do. */
+function Searching(props: { s: GroupSession }): JSX.Element {
+  const [long, setLong] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setLong(true), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+  const endpoints = props.s.relays.value?.endpoints ?? [];
+  const online = endpoints.filter((e) => e.state === "online").length;
+  return (
+    <div class="card center stack" data-testid="searching">
+      <div class="spinner" aria-hidden="true" />
+      <p class="hint">{t("loadingGroup")}</p>
+      <p class="small faint">
+        {t("relaysAnswering", { n: online, total: endpoints.length })}
+        {props.s.peers.value > 0 && ` · ${t("peers", { n: props.s.peers.value })}`}
+      </p>
+      {long && <p class="hint">{t("searchingLong")}</p>}
+    </div>
   );
 }
 
@@ -66,10 +89,7 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
         </Link>
       )}
       {!view || !genesis ? (
-        <div class="card center stack">
-          <div class="spinner" aria-hidden="true" />
-          <p class="hint">{t("loadingGroup")}</p>
-        </div>
+        <Searching s={s} />
       ) : !view.me && view.excluded.some((m) => m.key === s.me.card.key) ? (
         <div class="card stack" data-testid="excluded">
           <h2>{t("youWereExcluded")}</h2>
