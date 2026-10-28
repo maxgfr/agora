@@ -29,7 +29,19 @@ function Lock(): JSX.Element {
     return (
       <div class="stack">
         <p class="ok-line">{t("lockedOn")}</p>
-        <button type="button" class="btn" onClick={() => void setPassphrase(null)}>
+        <button
+          type="button"
+          class="btn"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await setPassphrase(null);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
           {t("removeLock")}
         </button>
       </div>

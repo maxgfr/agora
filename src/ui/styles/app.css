@@ -823,3 +823,10 @@ details.paste summary {
 details.paste[open] summary {
   margin-bottom: 12px;
 }
+details.forgot {
+  margin-top: 8px;
+}
+details.forgot summary {
+  color: var(--muted);
+  font-size: 0.9rem;
+}

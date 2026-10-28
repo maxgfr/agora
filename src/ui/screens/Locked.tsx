@@ -1,6 +1,6 @@
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
-import { unlock } from "../../app/state";
+import { unlock, wipeAll } from "../../app/state";
 import { t } from "../i18n";
 
 export function Locked(): JSX.Element {
@@ -36,6 +36,21 @@ export function Locked(): JSX.Element {
       <button type="submit" class="btn btn-primary" disabled={busy || !pass}>
         {t("unlock")}
       </button>
+      <details class="forgot">
+        <summary>{t("forgotPassphrase")}</summary>
+        <div class="stack">
+          <p class="hint">{t("forgotPassphraseHint")}</p>
+          <button
+            type="button"
+            class="btn btn-danger"
+            onClick={() => {
+              if (confirm(t("wipeConfirm"))) void wipeAll();
+            }}
+          >
+            {t("wipe")}
+          </button>
+        </div>
+      </details>
     </form>
   );
 }

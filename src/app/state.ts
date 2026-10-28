@@ -7,7 +7,14 @@
  * active tab; another one offers to take over.
  */
 import { signal } from "@preact/signals";
-import { newVaultKey, openVault, sealVault, type VaultKey } from "../crypto/vault";
+import {
+  argon2Here,
+  newVaultKey,
+  openVault,
+  sealVault,
+  setKdf,
+  type VaultKey,
+} from "../crypto/vault";
 import { fromUtf8, utf8 } from "../lib/bytes";
 import { classifyCode, type Invitation, parseInvite } from "../model/codes";
 import type { MemberCard } from "../model/events";
@@ -15,7 +22,7 @@ import { foundGroup, type GroupRecord, GroupSession, joinRecord } from "../model
 import { IdbStore, MemoryStore, type Store } from "../model/store";
 import type { Key } from "../ui/i18n";
 import { diag, startDiagnostics, storageError } from "./diag";
-import { ringChecker } from "./ring-worker";
+import { ringChecker, workerKdf } from "./ring-worker";
 import { type GroupTab, hashToRoute, type Route, routeToHash } from "./router";
 import { iceServers, settings, signalConfig } from "./settings";
 
@@ -197,12 +204,12 @@ interface LockManagerLike {
 }
 
 /** Holds the one-active-tab lock; false when another tab has it. */
-function claimTab(): Promise<boolean> {
+function claimTab(force = false): Promise<boolean> {
   const locks = (navigator as { locks?: LockManagerLike }).locks;
   if (!locks) return Promise.resolve(true);
-  let steal = false;
+  let steal = force;
   try {
-    steal = sessionStorage.getItem(TAKEOVER_FLAG) === "1";
+    steal ||= sessionStorage.getItem(TAKEOVER_FLAG) === "1";
     sessionStorage.removeItem(TAKEOVER_FLAG);
   } catch {
     // no storage
@@ -237,6 +244,24 @@ export function takeOver(): void {
 }
 
 /**
+ * The tab in front is the one in use: an inactive tab (another one took over, or it opened
+ * while another was active, e.g. from an invitation link) takes over as soon as it is looked
+ * at, instead of sitting on "open in another tab", which reads as a frozen page.
+ */
+function takeOverWhenSeen(): void {
+  const maybe = () => {
+    if (
+      phase.value === "elsewhere" &&
+      document.visibilityState === "visible" &&
+      document.hasFocus()
+    )
+      takeOver();
+  };
+  document.addEventListener("visibilitychange", maybe);
+  window.addEventListener("focus", maybe);
+}
+
+/**
  * Coming back to the page: after the browser froze it (back-forward cache, a phone that slept,
  * a tab left in the background), its WebSockets may be dead without having said so. Reconnect
  * instead of showing a group that silently stopped updating.
@@ -267,18 +292,31 @@ export async function boot(): Promise<void> {
   window.addEventListener("popstate", fromLocation);
   startDiagnostics();
   watchLifecycle();
+  takeOverWhenSeen();
+  // The device lock's Argon2id runs in the worker: half a second of CPU off the page.
+  setKdf(workerKdf(argon2Here));
   try {
-    if (!(await claimTab())) {
+    // Another tab holds the profile: a tab opened in front (an invitation link, a bookmark)
+    // takes over at once; one opened in the background waits until it is looked at.
+    let active = await claimTab();
+    if (!active && document.visibilityState === "visible" && document.hasFocus())
+      active = await claimTab(true);
+    if (!active) {
       phase.value = "elsewhere";
       return;
     }
     const blob = await store.loadProfile();
-    if (blob && flag(LOCKED_FLAG)) {
+    // What the stored profile is decides, not the flag: a reload between writing the profile
+    // and updating the flag must neither show a plain profile as locked nor, worse, read a
+    // locked one as empty (and then save that emptiness over it).
+    const plain = blob ? parseProfile(blob) : { v: 1 as const, groups: [] };
+    if (!plain) {
       locked.value = true;
       phase.value = "locked";
       return;
     }
-    open(blob);
+    if (flag(LOCKED_FLAG)) setFlag(false);
+    open(plain);
   } catch {
     phase.value = "error";
   }
@@ -290,24 +328,37 @@ export async function unlock(pass: string): Promise<boolean> {
   if (!blob) return false;
   try {
     const { data, vk } = await openVault(pass, blob);
+    const profile = parseProfile(data);
+    if (!profile) return false;
     vaultKey = vk;
-    open(data);
+    open(profile);
     return true;
   } catch {
     return false;
   }
 }
 
-function open(plain: Uint8Array | null): void {
-  let profile: Profile = { v: 1, groups: [] };
-  if (plain) {
-    try {
-      profile = JSON.parse(fromUtf8(plain)) as Profile;
-    } catch {
-      profile = { v: 1, groups: [] };
-    }
+/** The profile, if `blob` is a plain one (null: locked, or not a profile at all). */
+function parseProfile(blob: Uint8Array): Profile | null {
+  try {
+    const p = JSON.parse(fromUtf8(blob)) as Partial<Profile>;
+    return p && p.v === 1 && Array.isArray(p.groups) ? (p as Profile) : null;
+  } catch {
+    return null;
   }
-  groups.value = profile.groups ?? [];
+}
+
+function setFlag(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(LOCKED_FLAG, "1");
+    else localStorage.removeItem(LOCKED_FLAG);
+  } catch {
+    // no storage: the stored profile's own form tells anyway
+  }
+}
+
+function open(profile: Profile): void {
+  groups.value = profile.groups;
   ringCheck = ringChecker();
   // Sessions load and sync in the background: the screens show them as they fill in.
   for (const rec of groups.value) void startSession(rec);
@@ -354,17 +405,12 @@ export function save(): Promise<void> {
   return next;
 }
 
-/** Sets, changes or (null) removes the passphrase. */
+/** Sets, changes or (null) removes the passphrase; resolves once the profile is rewritten. */
 export async function setPassphrase(pass: string | null): Promise<void> {
   vaultKey = pass ? await newVaultKey(pass) : null;
-  locked.value = pass !== null;
-  try {
-    if (pass) localStorage.setItem(LOCKED_FLAG, "1");
-    else localStorage.removeItem(LOCKED_FLAG);
-  } catch {
-    // no storage: the profile stays as it is written below
-  }
   await save();
+  locked.value = pass !== null;
+  setFlag(pass !== null);
 }
 
 // ---------------------------------------------------------------------------

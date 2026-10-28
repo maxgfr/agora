@@ -22,11 +22,19 @@ export interface VaultKey {
   key: Bytes;
 }
 
-async function derive(passphrase: string, salt: Uint8Array): Promise<Bytes> {
+/** Argon2id on this thread (the app hands it to its worker, see `setKdf`). */
+export async function argon2Here(passphrase: string, salt: Uint8Array): Promise<Bytes> {
   return (await argon2idAsync(utf8(passphrase.normalize("NFKC")), salt, {
     ...ARGON,
     dkLen: 32,
   })) as Bytes;
+}
+
+let derive = argon2Here;
+
+/** Where Argon2id runs (the page sets its worker; tests keep this thread). */
+export function setKdf(kdf: (passphrase: string, salt: Uint8Array) => Promise<Bytes>): void {
+  derive = kdf;
 }
 
 /** A key for a new lock (fresh salt). */

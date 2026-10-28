@@ -67,6 +67,8 @@ export class Swarm {
   private readonly linkKeys: Map<string, Uint8Array>;
   private hello: ReturnType<typeof setInterval> | undefined;
   private closed = false;
+  /** Which transports were online at the last status, to notice one coming up. */
+  private online = "";
 
   constructor(
     private readonly g: GroupKeys,
@@ -79,7 +81,16 @@ export class Swarm {
       this.tag.padEnd(20, "0").slice(0, 20),
       {
         onEnvelope: (wire) => this.onSignal(wire),
-        onStatus: (s) => host.onStatus?.(s),
+        onStatus: (s) => {
+          // A transport just came online: say hello there now, not at the next round.
+          const online = s
+            .filter((t) => t.state === "online")
+            .map((t) => t.name)
+            .join();
+          if (online && online !== this.online) this.sayHello();
+          this.online = online;
+          host.onStatus?.(s);
+        },
       },
       opts.factory,
     );

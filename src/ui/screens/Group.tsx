@@ -70,6 +70,11 @@ export function GroupScreen(props: { id: string; tab: GroupTab; item?: string })
           <div class="spinner" aria-hidden="true" />
           <p class="hint">{t("loadingGroup")}</p>
         </div>
+      ) : !view.me && view.excluded.some((m) => m.key === s.me.card.key) ? (
+        <div class="card stack" data-testid="excluded">
+          <h2>{t("youWereExcluded")}</h2>
+          <p class="hint">{t("youWereExcludedHint")}</p>
+        </div>
       ) : !view.me ? (
         <Admission s={s} view={view} />
       ) : (

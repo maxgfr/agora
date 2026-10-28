@@ -38,7 +38,11 @@ export function QrScanner(props: {
         setError(t("cameraUnavailable"));
         return;
       }
-      if (stopped || !video.current) return;
+      // Closed while the browser was still asking for the camera: let go of it at once.
+      if (stopped || !video.current) {
+        for (const track of stream.getTracks()) track.stop();
+        return;
+      }
       video.current.srcObject = stream;
       await video.current.play().catch(() => {});
       const Native = (globalThis as { BarcodeDetector?: DetectorCtor }).BarcodeDetector;
