@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { type GroupTab, go, leaveGroup, session, sessionsVersion } from "../../app/state";
+import { type GroupTab, go, groups, leaveGroup, session, sessionsVersion } from "../../app/state";
 import type { GroupSession } from "../../model/session";
 import { Link } from "../components/Link";
 import { Actions } from "../group/Actions";
@@ -34,6 +34,10 @@ function Status(props: { s: GroupSession }): JSX.Element {
 export function GroupScreen(props: { id: string; tab: GroupTab; item?: string }): JSX.Element {
   void sessionsVersion.value;
   const s = session(props.id);
+  if (!s && groups.value.some((g) => g.id === props.id)) {
+    // Restarting (back from sleep, network settings): only a moment.
+    return <div class="spinner" aria-hidden="true" />;
+  }
   if (!s) {
     return (
       <div class="stack narrow">

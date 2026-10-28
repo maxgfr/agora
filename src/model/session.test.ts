@@ -283,10 +283,11 @@ test("a newcomer asks a member by name; only that member sees it and vouches in 
   const bob = device(joinRecord(inv, "bob-the-newcomer"));
   await bob.s.start();
   await until(() => bob.s.view.value?.members.length === 2);
+  // Nobody by that name: nothing is sent, but it reads as sent (the form never says).
   expect(await bob.s.requestVouch("nobody")).toBe(0);
   // Typed by the newcomer, case and spaces aside.
   expect(await bob.s.requestVouch("  ada ")).toBe(1);
-  expect(bob.s.record.asked).toEqual(["Ada"]);
+  expect(bob.s.record.asked).toEqual(["nobody", "ada"]);
   await until(() => a.s.requests.value.length === 1);
   expect(a.s.requests.value[0]?.card).toEqual(bob.s.me.card);
   // Carol, another member, sees nothing: the request is boxed to Ada.

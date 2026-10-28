@@ -20,7 +20,6 @@ function AskMember(props: { s: GroupSession; view: GroupView }): JSX.Element {
   void s.recordRev.value;
   const [name, setName] = useState("");
   const { busy, error, run } = useAction();
-  const [missing, setMissing] = useState(false);
   const vouchedBy = new Set(s.vouches.value.map((v) => v.by));
   const done = (asked: string) =>
     view.members.some(
@@ -35,9 +34,8 @@ function AskMember(props: { s: GroupSession; view: GroupView }): JSX.Element {
         onSubmit={(e) => {
           e.preventDefault();
           void run(async () => {
-            const n = await s.requestVouch(name);
-            setMissing(n === 0);
-            if (n > 0) setName("");
+            await s.requestVouch(name);
+            setName("");
           });
         }}
       >
@@ -49,20 +47,12 @@ function AskMember(props: { s: GroupSession; view: GroupView }): JSX.Element {
           aria-label={t("askMemberLabel")}
           placeholder={t("askMemberPh")}
           data-testid="ask-member"
-          onInput={(e) => {
-            setName(e.currentTarget.value);
-            setMissing(false);
-          }}
+          onInput={(e) => setName(e.currentTarget.value)}
         />
         <button type="submit" class="btn btn-primary" disabled={busy || !name.trim()}>
           {t("sendRequest")}
         </button>
       </form>
-      {missing && (
-        <p class="error" role="alert">
-          {t("nobodyByThatName")}
-        </p>
-      )}
       {error && (
         <p class="error" role="alert">
           {error}

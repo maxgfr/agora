@@ -14,6 +14,7 @@ import type { MemberCard } from "../model/events";
 import { foundGroup, type GroupRecord, GroupSession, joinRecord } from "../model/session";
 import { IdbStore, MemoryStore, type Store } from "../model/store";
 import type { Key } from "../ui/i18n";
+import { diag, startDiagnostics, storageError } from "./diag";
 import { ringChecker } from "./ring-worker";
 import { type GroupTab, hashToRoute, type Route, routeToHash } from "./router";
 import { iceServers, settings, signalConfig } from "./settings";
@@ -37,7 +38,13 @@ export const sessionsVersion = signal(0);
 /** The last save failed (storage full or unavailable): shown, so nothing is lost silently. */
 export const saveError = signal(false);
 
-const store: Store = typeof indexedDB === "undefined" ? new MemoryStore() : new IdbStore();
+const idb = typeof indexedDB === "undefined" ? null : new IdbStore();
+const store: Store = idb ?? new MemoryStore();
+if (idb)
+  idb.onError = (err) => {
+    storageError(err);
+    saveError.value = true;
+  };
 const sessions = new Map<string, GroupSession>();
 let vaultKey: VaultKey | null = null;
 let ringCheck: ReturnType<typeof ringChecker> | null = null;
@@ -222,9 +229,37 @@ export function takeOver(): void {
   location.reload();
 }
 
+/**
+ * Coming back to the page: after the browser froze it (back-forward cache, a phone that slept,
+ * a tab left in the background), its WebSockets may be dead without having said so. Reconnect
+ * instead of showing a group that silently stopped updating.
+ */
+function watchLifecycle(): void {
+  let hiddenAt = 0;
+  const revive = () => {
+    if (phase.value !== "ready") return;
+    diag.reconnects++;
+    void restartSessions();
+  };
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) revive();
+  });
+  window.addEventListener("online", revive);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hiddenAt = Date.now();
+      void idb?.flush();
+    } else if (hiddenAt && Date.now() - hiddenAt > 2 * 60_000) revive();
+  });
+  // Queued writes go out before the page goes away.
+  window.addEventListener("pagehide", () => void idb?.flush());
+}
+
 export async function boot(): Promise<void> {
   window.addEventListener("hashchange", fromLocation);
   window.addEventListener("popstate", fromLocation);
+  startDiagnostics();
+  watchLifecycle();
   try {
     if (!(await claimTab())) {
       phase.value = "elsewhere";
@@ -305,7 +340,8 @@ export function save(): Promise<void> {
     await store.saveProfile(vaultKey ? sealVault(vaultKey, plain) : plain);
     saveError.value = false;
   });
-  saving = next.catch(() => {
+  saving = next.catch((err) => {
+    storageError(err);
     saveError.value = true;
   });
   return next;
@@ -365,10 +401,12 @@ export async function leaveGroup(id: string): Promise<void> {
   await save();
 }
 
-/** Restarts every session (after the network settings changed). */
-export function restartSessions(): void {
+/** Restarts every session (network settings changed, or the page came back from sleep). */
+export async function restartSessions(): Promise<void> {
   for (const s of sessions.values()) s.close();
   sessions.clear();
+  // What the old sessions queued is written before the new ones read it back.
+  await idb?.flush();
   for (const rec of groups.value) void startSession(rec);
 }
 

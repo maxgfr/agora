@@ -1,7 +1,16 @@
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
+import { blocks, diag, report } from "../../app/diag";
 import { saveSettings, settings } from "../../app/settings";
-import { locked, restartSessions, setPassphrase, wipeAll } from "../../app/state";
+import {
+  groups,
+  locked,
+  restartSessions,
+  session,
+  sessionsVersion,
+  setPassphrase,
+  wipeAll,
+} from "../../app/state";
 import { Link } from "../components/Link";
 import { lang, setLang, t } from "../i18n";
 
@@ -69,6 +78,54 @@ function Lock(): JSX.Element {
         {t("setLock")}
       </button>
     </form>
+  );
+}
+
+function Diagnostics(): JSX.Element {
+  void sessionsVersion.value;
+  const list = blocks.value;
+  const worst = list.reduce((m, b) => Math.max(m, b.ms), 0);
+  const [copied, setCopied] = useState(false);
+  const extra = {
+    groups: groups.value.length,
+    sessions: groups.value.map((g) => {
+      const s = session(g.id);
+      return {
+        relays: s?.relays.value?.state ?? "none",
+        peers: s?.peers.value ?? 0,
+        verifying: s?.verifying.value ?? null,
+        storageFailed: s?.storageFailed.value ?? false,
+      };
+    }),
+  };
+  return (
+    <section class="card stack" data-testid="diagnostics">
+      <h2>{t("diagTitle")}</h2>
+      <p class="hint">{t("diagHint")}</p>
+      <ul class="list-plain stack-tight small">
+        <li>
+          {list.length === 0 ? t("diagNoBlock") : t("diagWorst", { ms: worst, n: list.length })}
+        </li>
+        <li>{t("diagWorker", { n: diag.workerRestarts })}</li>
+        <li>{t("diagStorage", { n: diag.storageErrors })}</li>
+        <li>{t("diagReconnects", { n: diag.reconnects })}</li>
+      </ul>
+      <button
+        type="button"
+        class="btn btn-small"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(report(extra));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            // clipboard refused
+          }
+        }}
+      >
+        {copied ? t("copied") : t("diagCopy")}
+      </button>
+    </section>
   );
 }
 
@@ -201,6 +258,7 @@ export function SettingsScreen(): JSX.Element {
           {saved && <span class="ok-line">{t("saved")}</span>}
         </div>
       </form>
+      <Diagnostics />
       <div class="danger-zone">
         <button
           type="button"

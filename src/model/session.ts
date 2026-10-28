@@ -110,6 +110,8 @@ export class GroupSession {
   readonly vouches = signal<Vouch[]>([]);
   /** Newcomers asking us to vouch for them (only while we are a member). */
   readonly requests = signal<IncomingRequest[]>([]);
+  /** Reading this group from the device's storage failed (it still syncs from the network). */
+  readonly storageFailed = signal(false);
   /** Bumped whenever the record changes (pending ticket, scheduled admission…). */
   readonly recordRev = signal(0);
 
@@ -148,8 +150,13 @@ export class GroupSession {
 
   /** Loads what the store holds, goes online, then checks and folds. */
   async start(): Promise<void> {
-    this.verifier.preload(await this.store.verdicts(this.record.id));
-    for (const wire of await this.store.wires(this.record.id)) await this.ingest(wire, false);
+    // Storage that fails or hangs must not keep the group offline: go on without it.
+    try {
+      this.verifier.preload(await this.store.verdicts(this.record.id));
+      for (const wire of await this.store.wires(this.record.id)) await this.ingest(wire, false);
+    } catch {
+      this.storageFailed.value = true;
+    }
     if (!this.net.offline && !this.closed) this.connect();
     await this.recompute();
     this.scheduleAdmit();
@@ -231,7 +238,8 @@ export class GroupSession {
     if (this.wires.has(id)) return false;
     this.wires.set(id, wire);
     if (fromNetwork) {
-      await this.store.addWire(this.record.id, id, wire);
+      // Never waited on: a slow or hung storage must not hold events back.
+      this.persist(id, wire);
       // Peers that are online get it at once, even if it is not readable here.
       this.swarm?.broadcast(wire);
     }
@@ -409,7 +417,9 @@ export class GroupSession {
 
   /**
    * Asks the member(s) going by `name` (typed by the newcomer: no list of members is shown)
-   * to vouch for us. Returns how many members got the request (0: nobody by that name).
+   * to vouch for us. The newcomer is never told whether that name exists: the request reads
+   * as sent either way, so the form cannot be used to find out who is in the group. Returns
+   * how many members got it (for tests).
    */
   async requestVouch(name: string): Promise<number> {
     const view = this.view.value;
@@ -419,11 +429,12 @@ export class GroupSession {
       (m) => m.key !== this.me.card.key && m.name?.trim().toLocaleLowerCase() === wanted,
     );
     for (const t of targets) await this.publish(createRequest(this.g, this.me, t));
-    if (targets.length > 0) {
-      const asked = new Set(this.record.asked ?? []);
-      asked.add((targets[0] as MemberCard).name as string);
-      this.updateRecord({ asked: [...asked] });
-    }
+    // As typed, matched or not.
+    const typed = name.trim();
+    const asked = (this.record.asked ?? []).filter(
+      (n) => n.toLocaleLowerCase() !== typed.toLocaleLowerCase(),
+    );
+    this.updateRecord({ asked: [...asked, typed] });
     return targets.length;
   }
 
@@ -457,14 +468,21 @@ export class GroupSession {
     const evId = eventId(ev);
     // Ours: no need to spend a ring check on it, and it shows at once.
     this.verifier.trust(evId);
-    await this.store.addWire(this.record.id, id, wire);
     await this.ingest(wire, false);
+    // Out first, then kept: neither the network nor the storage waits on the other.
     this.nostr?.send(this.g.topic, wire);
     this.swarm?.broadcast(wire);
-    // A backlog may be under verification: show our event now rather than after it.
-    if (this.recomputing) this.show(this.verifier.valid(this.events));
-    else await this.recompute();
+    this.persist(id, wire);
+    // Shown now; other people's events still being checked are folded in as they pass.
+    this.show(this.verifier.valid(this.events));
+    this.schedule();
     return evId;
+  }
+
+  private persist(id: string, wire: string): void {
+    this.store.addWire(this.record.id, id, wire).catch(() => {
+      this.storageFailed.value = true;
+    });
   }
 
   private requireMember() {
