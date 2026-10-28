@@ -1,0 +1,24 @@
+{
+  "name": "agora",
+  "short_name": "agora",
+  "description": "End-to-end encrypted polls and collective actions: one real person, one vote, and nobody knows who voted what. No account, no server.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f4ee",
+  "theme_color": "#1f6b52",
+  "categories": ["social", "productivity", "security"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
