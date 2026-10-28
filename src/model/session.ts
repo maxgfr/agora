@@ -558,6 +558,22 @@ export class GroupSession {
     );
   }
 
+  /** Publishes a delayed admission now (the newcomer chose not to wait). */
+  async admitNow(): Promise<void> {
+    const p = this.record.pendingAdmit;
+    if (!p) return;
+    clearTimeout(this.admitTimer);
+    const held = parseEvent(JSON.parse(p.event));
+    if (held?.t !== "admit") return;
+    // Signed again with the real time (the held one is dated when the delay ends).
+    const ev = createAdmit(this.g, this.me, {
+      vouches: held.vouches,
+      ...(held.ticket ? { ticket: held.ticket } : {}),
+    });
+    await this.publish(ev);
+    this.updateRecord({ pendingAdmit: undefined });
+  }
+
   /** Organizer side: signs a blinded request with this device's organizer key. */
   signTicket(request: Uint8Array): Uint8Array {
     const org = this.record.organizer?.[0];

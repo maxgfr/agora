@@ -75,13 +75,16 @@ const fr = {
   requestTicket: "Demander un ticket",
   yourRequest: "Votre demande, à montrer à l'organisateur",
   pasteAnswer: "Code de réponse de l'organisateur",
-  delayAdmit: "Différer mon admission de quelques minutes (recommandé)",
+  delayAdmit: "Attendre un peu avant d'entrer (recommandé)",
   delayAdmitHint:
-    "Ainsi l'organisateur ne peut pas relier l'heure où il a signé à l'heure de votre arrivée.",
+    "Vous entrez entre 10 secondes et 3 minutes plus tard, au hasard : l'organisateur ne peut pas relier l'heure où il a signé à votre arrivée, donc à vos votes.",
   validateTicket: "Valider le ticket",
   invalidAnswer: "Cette réponse ne correspond pas à votre demande.",
-  admitScheduled: "Ticket valide. Votre admission sera publiée vers {t}.",
   admitPublishing: "Admission en cours de publication…",
+  admitCountdown: "Ticket valide : vous entrez dans le groupe dans {t}",
+  admitCountdownHint:
+    "Cette attente est voulue (elle protège votre anonymat face à l'organisateur). Vous pouvez quitter l'appli, l'entrée se fera à la prochaine ouverture.",
+  admitNow: "Entrer maintenant",
   // Polls
   newPoll: "Nouveau sondage",
   question: "Question",
@@ -146,9 +149,9 @@ const fr = {
   inviteTitle: "Lien d'invitation",
   inviteHint:
     "Toute personne qui a ce lien peut lire le groupe et demander à entrer, mais ne peut voter qu'une fois admise. Envoyez-le par un canal de confiance.",
-  ticketDesk: "Guichet des tickets",
+  ticketDesk: "Admettre par ticket (organisateur)",
   ticketDeskHint:
-    "Vérifiez la personne, puis scannez ou collez sa demande. Votre signature est aveugle : vous ne saurez pas quelle clé vous signez.",
+    "Pour quelqu'un que vous avez vérifié vous-même (pièce d'identité, liste d'adhérents, en personne) et qui n'a pas de parrain dans le groupe. Il clique sur « Demander un ticket » et vous montre le code obtenu : collez-le ou scannez-le ici, signez, puis montrez-lui la réponse. Votre signature est aveugle : vous savez à qui vous avez donné un ticket, jamais avec quelle clé il votera.",
   pasteRequest: "Demande de ticket",
   invalidRequest: "Ce n'est pas une demande de ticket.",
   signTicket: "Signer le ticket",
@@ -245,9 +248,9 @@ const fr = {
   stepVouch: "2. Parrainez-la",
   stepVouchHint:
     "Elle vous le demande depuis l'appli (sa demande apparaît en haut de cette page), ou vous scannez sa carte avec le bouton Scanner, ou vous collez son code ici.",
-  stepTicket: "2. Signez-lui un ticket",
+  stepTicket: "2. Ou admettez-la par ticket",
   stepTicketHint:
-    "Elle demande un ticket depuis l'appli et vous montre sa demande : signez-la au guichet ci-dessous.",
+    "Si personne ne peut la parrainer : vérifiez qui elle est, puis signez sa demande de ticket dans la section ci-dessous.",
   showQr: "Afficher le QR code",
   hideQr: "Masquer le QR code",
   forgotPassphrase: "Phrase de passe oubliée ?",
@@ -334,12 +337,16 @@ const en: Dict = {
   requestTicket: "Ask for a ticket",
   yourRequest: "Your request, to show the organizer",
   pasteAnswer: "The organizer's answer code",
-  delayAdmit: "Delay my admission by a few minutes (recommended)",
-  delayAdmitHint: "So the organizer cannot match the time they signed with the time you arrive.",
+  delayAdmit: "Wait a little before joining (recommended)",
+  delayAdmitHint:
+    "You join at a random moment 10 seconds to 3 minutes later: the organizer cannot match the time they signed with your arrival, so with your votes.",
   validateTicket: "Use the ticket",
   invalidAnswer: "This answer does not match your request.",
-  admitScheduled: "Valid ticket. Your admission will be published around {t}.",
   admitPublishing: "Publishing your admission…",
+  admitCountdown: "Valid ticket: you join the group in {t}",
+  admitCountdownHint:
+    "This wait is on purpose (it protects your anonymity from the organizer). You can leave the app: you will join when it opens next.",
+  admitNow: "Join now",
   newPoll: "New poll",
   question: "Question",
   options: "Answers",
@@ -400,9 +407,9 @@ const en: Dict = {
   inviteTitle: "Invitation link",
   inviteHint:
     "Anyone with this link can read the group and ask to join, but can only vote once admitted. Send it over a channel you trust.",
-  ticketDesk: "Ticket desk",
+  ticketDesk: "Admit with a ticket (organizer)",
   ticketDeskHint:
-    "Check the person, then scan or paste their request. Your signature is blind: you will not know which key you sign.",
+    'For someone you checked yourself (an ID, a membership list, in person) who has no one in the group to vouch for them. They tap "Ask for a ticket" and show you the code: paste or scan it here, sign, then show them the answer. Your signature is blind: you know whom you gave a ticket to, never which key they will vote with.',
   pasteRequest: "Ticket request",
   invalidRequest: "This is not a ticket request.",
   signTicket: "Sign the ticket",
@@ -497,9 +504,9 @@ const en: Dict = {
   stepVouch: "2. Vouch for them",
   stepVouchHint:
     "They ask you from the app (their request shows at the top of this page), or you scan their card with the Scan button, or paste their code here.",
-  stepTicket: "2. Sign them a ticket",
+  stepTicket: "2. Or admit them with a ticket",
   stepTicketHint:
-    "They ask for a ticket in the app and show you their request: sign it at the desk below.",
+    "If nobody can vouch for them: check who they are, then sign their ticket request in the section below.",
   showQr: "Show the QR code",
   hideQr: "Hide the QR code",
   forgotPassphrase: "Forgot the passphrase?",
