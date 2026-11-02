@@ -46,13 +46,30 @@ export const settings = signal<Settings>(
   typeof localStorage === "undefined" ? DEFAULT_SETTINGS : load(),
 );
 
-export function saveSettings(next: Partial<Settings>): void {
+/** False when the preferences could not be stored (they then last until the page reloads). */
+export function saveSettings(next: Partial<Settings>): boolean {
   settings.value = { ...settings.value, ...next };
   try {
     localStorage.setItem(KEY, JSON.stringify(settings.value));
+    return true;
   } catch {
-    // Private mode: preferences last for this tab only.
+    // Private mode, or the origin's storage is full (it is shared with every other site of
+    // maxgfr.github.io): preferences last for this tab only.
+    return false;
   }
+}
+
+/** Every key of agora's own (`agora.…`); the other sites of the origin keep theirs. */
+export const OWN_PREFIX = "agora.";
+
+/** Removes agora's keys from `storage`, and only those: the origin is shared with other sites. */
+export function forgetOwnKeys(storage: Storage): void {
+  const own: string[] = [];
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key?.startsWith(OWN_PREFIX)) own.push(key);
+  }
+  for (const key of own) storage.removeItem(key);
 }
 
 /**

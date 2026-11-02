@@ -24,7 +24,7 @@ import type { Key } from "../ui/i18n";
 import { diag, startDiagnostics, storageError } from "./diag";
 import { ringChecker, workerKdf } from "./ring-worker";
 import { type GroupTab, hashToRoute, type Route, routeToHash } from "./router";
-import { iceServers, settings, signalConfig } from "./settings";
+import { forgetOwnKeys, iceServers, settings, signalConfig } from "./settings";
 
 export type { GroupTab, Route };
 
@@ -467,8 +467,9 @@ export async function wipeAll(): Promise<void> {
   for (const s of sessions.values()) s.close();
   sessions.clear();
   await Promise.race([store.wipe(), new Promise((r) => setTimeout(r, 3000))]);
+  // Only agora's own keys: every site of maxgfr.github.io shares this storage.
   try {
-    localStorage.clear();
+    forgetOwnKeys(localStorage);
   } catch {
     // nothing kept
   }

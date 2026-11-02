@@ -150,6 +150,7 @@ export function SettingsScreen(): JSX.Element {
   const [relayOnly, setRelayOnly] = useState(s.relayOnly);
   const [turn, setTurn] = useState(s.turn ?? { url: "", username: "", credential: "" });
   const [saved, setSaved] = useState(false);
+  const [notStored, setNotStored] = useState(false);
 
   return (
     <div class="stack narrow">
@@ -183,7 +184,7 @@ export function SettingsScreen(): JSX.Element {
         class="card stack"
         onSubmit={async (e) => {
           e.preventDefault();
-          saveSettings({
+          const stored = saveSettings({
             relays: lines(relays),
             trackers: lines(trackers),
             stun: lines(stun),
@@ -192,6 +193,8 @@ export function SettingsScreen(): JSX.Element {
             turn: turn.url.trim() ? { ...turn, url: turn.url.trim() } : null,
           });
           restartSessions();
+          setNotStored(!stored);
+          if (!stored) return;
           setSaved(true);
           setTimeout(() => setSaved(false), 1500);
         }}
@@ -269,6 +272,11 @@ export function SettingsScreen(): JSX.Element {
           </button>
           {saved && <span class="ok-line">{t("saved")}</span>}
         </div>
+        {notStored && (
+          <p class="error" role="alert">
+            {t("settingsNotStored")}
+          </p>
+        )}
       </form>
       <Diagnostics />
       <div class="danger-zone">
