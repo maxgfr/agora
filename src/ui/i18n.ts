@@ -215,6 +215,8 @@ const fr = {
   cameraUnavailable: "Caméra indisponible. Collez le code à la place.",
   cameraPreview: "Aperçu de la caméra pour scanner un QR code",
   saveFailed: "Impossible d'enregistrer sur cet appareil (stockage plein ou indisponible).",
+  settingsNotStored:
+    "Le stockage de ce site est plein ou indisponible : ces réglages s'appliquent, mais seront perdus au rechargement.",
   elsewhereTitle: "agora est ouvert dans un autre onglet",
   elsewhereHint:
     "Un seul onglet à la fois, pour que deux onglets n'écrasent pas vos groupes. Fermez l'autre, ou utilisez celui-ci.",
@@ -487,6 +489,8 @@ const en: Dict = {
   cameraUnavailable: "Camera unavailable. Paste the code instead.",
   cameraPreview: "Camera preview for QR scanning",
   saveFailed: "Could not save on this device (storage full or unavailable).",
+  settingsNotStored:
+    "Storage for this site is full or unavailable: these settings apply now, but will be lost on reload.",
   elsewhereTitle: "agora is open in another tab",
   elsewhereHint:
     "One tab at a time, so two tabs do not overwrite your groups. Close the other one, or use this one.",
